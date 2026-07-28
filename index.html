@@ -1,0 +1,1715 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Zeiterfassung</title>
+<style>
+  :root{
+    --bg:#f4f6f8; --bg-alt:#ffffff; --text:#1c2530; --text-dim:#5c6b7a;
+    --border:#dfe4ea; --accent:#2f6fed; --accent-dim:#e8effe;
+    --green:#1a9c5f; --green-bg:#e6f7ef; --red:#d63b3b; --red-bg:#fdeaea;
+    --amber:#c98a12; --amber-bg:#fbf1de; --shadow:0 1px 3px rgba(20,30,50,.08), 0 1px 2px rgba(20,30,50,.06);
+    --radius:10px;
+  }
+  html.dark{
+    --bg:#141a22; --bg-alt:#1c2530; --text:#e7ecf2; --text-dim:#93a1b1;
+    --border:#2c3a4a; --accent:#5b8cff; --accent-dim:#22314d;
+    --green:#3ddc90; --green-bg:#12301f; --red:#ff6b6b; --red-bg:#3a1717;
+    --amber:#e6b34d; --amber-bg:#3a2c10; --shadow:0 1px 3px rgba(0,0,0,.4);
+  }
+  *{box-sizing:border-box;}
+  body{
+    margin:0; font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
+    background:var(--bg); color:var(--text); transition:background .2s,color .2s;
+  }
+  header{
+    display:flex; align-items:center; justify-content:space-between; gap:12px;
+    padding:14px 20px; background:var(--bg-alt); border-bottom:1px solid var(--border);
+    position:sticky; top:0; z-index:20; flex-wrap:wrap;
+  }
+  header h1{font-size:18px; margin:0; display:flex; align-items:center; gap:8px; letter-spacing:.2px;}
+  header h1 .dot{width:9px;height:9px;border-radius:50%;background:var(--accent);display:inline-block;}
+  .header-actions{display:flex; gap:8px; align-items:center;}
+  nav{
+    display:flex; gap:4px; padding:0 20px; background:var(--bg-alt); border-bottom:1px solid var(--border);
+    overflow-x:auto; position:sticky; top:57px; z-index:19;
+  }
+  nav button{
+    border:none; background:none; padding:12px 14px; font-size:14px; color:var(--text-dim);
+    cursor:pointer; border-bottom:2px solid transparent; white-space:nowrap; font-weight:500;
+  }
+  nav button.active{color:var(--accent); border-bottom-color:var(--accent);}
+  main{padding:20px; max-width:1520px; margin:0 auto;}
+  .view{display:none;}
+  .view.active{display:block; animation:fade .15s ease;}
+  @keyframes fade{from{opacity:0;transform:translateY(3px);} to{opacity:1;transform:none;}}
+
+  .card{
+    background:var(--bg-alt); border:1px solid var(--border); border-radius:var(--radius);
+    padding:16px 18px; box-shadow:var(--shadow);
+  }
+  .grid-dash{display:grid; grid-template-columns:repeat(auto-fit,minmax(190px,1fr)); gap:12px; margin-bottom:20px;}
+  .dash-layout{display:grid; grid-template-columns:1.3fr 1fr; gap:20px; align-items:start;}
+  .dash-right h2{margin-bottom:10px;}
+  @media (max-width:960px){
+    .dash-layout{grid-template-columns:1fr;}
+  }
+  .stat .label{font-size:12.5px; color:var(--text-dim); font-weight:600; text-transform:uppercase; letter-spacing:.5px;}
+  .stat .value{font-size:26px; font-weight:700; margin-top:6px; font-variant-numeric:tabular-nums;}
+  .stat.wide{grid-column:span 2;}
+  .stat.wide .value{font-size:19px; letter-spacing:.2px;}
+  @media (max-width:500px){ .stat.wide{grid-column:span 1;} }
+  .ratio-rows{margin-top:8px; display:flex; flex-direction:column; gap:5px;}
+  .ratio-row{display:flex; justify-content:space-between; align-items:center; font-size:12.5px; color:var(--text-dim); padding-top:5px; border-top:1px solid var(--border);}
+  .ratio-row:first-child{border-top:none; padding-top:0;}
+  .ratio-row b{color:var(--text); font-variant-numeric:tabular-nums; font-size:13.5px;}
+  .stat .sub{font-size:12px; color:var(--text-dim); margin-top:2px;}
+  .pos{color:var(--green);} .neg{color:var(--red);} .neutral{color:var(--text-dim);}
+
+  h2{font-size:16px; margin:0 0 14px; font-weight:700;}
+  h3{font-size:14px; margin:18px 0 10px; font-weight:700; color:var(--text-dim); text-transform:uppercase; letter-spacing:.4px;}
+
+  .btn{
+    background:var(--accent); color:#fff; border:none; padding:9px 14px; border-radius:8px;
+    font-size:13.5px; font-weight:600; cursor:pointer; display:inline-flex; align-items:center; gap:6px;
+  }
+  .btn:hover{filter:brightness(1.07);}
+  .btn.secondary{background:var(--accent-dim); color:var(--accent);}
+  .btn.ghost{background:transparent; color:var(--text-dim); border:1px solid var(--border);}
+  .btn.danger{background:var(--red-bg); color:var(--red);}
+  .btn.small{padding:6px 10px; font-size:12.5px;}
+  .btn:disabled{opacity:.45; cursor:not-allowed;}
+
+  .month-nav{display:flex; align-items:center; gap:10px; margin-bottom:14px; flex-wrap:wrap;}
+  .month-nav .title{font-size:17px; font-weight:700; min-width:170px; text-align:center;}
+  .legend{display:flex; gap:14px; flex-wrap:wrap; font-size:12px; color:var(--text-dim); margin:8px 0 14px;}
+  .legend span{display:inline-flex; align-items:center; gap:5px;}
+  .swatch{width:10px;height:10px;border-radius:3px;display:inline-block;}
+
+  .table-wrap{overflow:auto; max-height:calc(100vh - 300px); min-height:260px; border:1px solid var(--border); border-radius:var(--radius); background:var(--bg-alt);}
+  .dash-table-wrap{min-height:520px; max-height:calc(100vh - 220px);}
+  table{border-collapse:collapse; width:100%; min-width:1350px; font-size:14.5px;}
+  th{
+    text-align:left; padding:10px 8px; background:var(--accent-dim); color:var(--text);
+    font-size:12px; text-transform:uppercase; letter-spacing:.3px; position:sticky; top:0; z-index:2; font-weight:700;
+  }
+  td{padding:8px 8px; border-top:1px solid var(--border); vertical-align:middle;}
+  tr.weekend td{background:var(--bg);}
+  tr.holiday td{background:var(--amber-bg);}
+  tr.next-open td.daycol{box-shadow:inset 3px 0 0 var(--accent);}
+  tr.today td{outline:2px solid var(--accent); outline-offset:-2px;}
+  td.daycol{white-space:nowrap; font-weight:600;}
+  td.daycol .wd{color:var(--text-dim); font-weight:500; font-size:0.82em;}
+  td .tag{font-size:0.75em; padding:1px 6px; border-radius:20px; background:var(--amber-bg); color:var(--amber); font-weight:700; margin-left:4px;}
+  .holiday-soll{margin-top:5px; display:flex; align-items:center; gap:5px;}
+  .holiday-soll label{font-size:0.72em; color:var(--text-dim); white-space:nowrap;}
+  .holiday-soll input{width:56px; min-width:56px; padding:3px 5px; font-size:0.85em;}
+  input[type=time], input[type=text], input[type=date], input[type=number], select{
+    background:var(--bg); border:1px solid var(--border); color:var(--text); border-radius:6px;
+    padding:5px 6px; font-size:14px; width:100%; min-width:64px;
+  }
+  input:disabled, select:disabled{opacity:.4;}
+  td.remark input{min-width:110px;}
+  .zeiten-cell{display:flex; flex-direction:column; gap:4px; min-width:260px;}
+  .seg-row{display:flex; align-items:center; gap:4px; flex-wrap:nowrap;}
+  .seg-row input.time-field{width:82px; min-width:82px; flex:none; text-align:center;}
+  .seg-sep{color:var(--text-dim); font-size:0.85em;}
+  .seg-remove{background:none; border:none; color:var(--red); cursor:pointer; font-size:0.85em; padding:2px 4px; flex:none;}
+  .seg-add{background:none; border:1px dashed var(--border); color:var(--accent); cursor:pointer; font-size:0.78em; padding:3px 8px; border-radius:6px; flex:none; white-space:nowrap; margin-left:4px;}
+  .seg-add:disabled{cursor:not-allowed; opacity:.4;}
+  .cap-hint{font-size:0.72em; color:var(--amber); cursor:help; margin-top:-2px;}
+  .bs-cell{display:flex; flex-direction:column; gap:3px; min-width:52px;}
+  .bs-pill{
+    background:var(--bg); border:1px solid var(--border); color:var(--text-dim); cursor:pointer;
+    font-size:10.5px; font-weight:700; padding:3px 6px; border-radius:6px; letter-spacing:.3px;
+  }
+  .bs-pill.active{background:var(--accent); border-color:var(--accent); color:#fff;}
+  td.saldo{font-weight:700; font-variant-numeric:tabular-nums;}
+  td.ist{font-variant-numeric:tabular-nums;}
+  .soll-inline{display:block; color:var(--text-dim); font-size:0.72em; font-weight:500; margin-top:2px;}
+  input.zeitzugangInput{width:76px; min-width:76px; text-align:center;}
+
+  .form-grid{display:grid; grid-template-columns:repeat(auto-fit,minmax(150px,1fr)); gap:12px;}
+  .field label{display:block; font-size:12px; color:var(--text-dim); margin-bottom:4px; font-weight:600;}
+  .shift-list{display:flex; flex-direction:column; gap:8px; margin-top:14px;}
+  .shift-row{display:flex; align-items:center; gap:10px; padding:10px 12px; border:1px solid var(--border); border-radius:8px; flex-wrap:wrap;}
+  .shift-row .order-btns{display:flex; flex-direction:column; gap:2px;}
+  .shift-row .order-btns button{padding:2px 6px; font-size:10px; line-height:1;}
+  .shift-row .name{font-weight:700; min-width:140px;}
+  .shift-row .time{color:var(--text-dim); font-size:13px;}
+  .shift-row .spacer{flex:1;}
+  .night-badge{font-size:10.5px; background:var(--accent-dim); color:var(--accent); padding:2px 7px; border-radius:20px; font-weight:700;}
+
+  .abw-summary{display:grid; grid-template-columns:repeat(auto-fit,minmax(150px,1fr)); gap:12px; margin-bottom:20px;}
+  .toast{
+    position:fixed; bottom:20px; left:50%; transform:translateX(-50%); background:var(--text); color:var(--bg-alt);
+    padding:10px 18px; border-radius:8px; font-size:13.5px; z-index:100; opacity:0; pointer-events:none; transition:opacity .25s, transform .25s;
+    box-shadow:var(--shadow);
+  }
+  .toast.show{opacity:1; transform:translateX(-50%) translateY(-4px);}
+  .row-gap{display:flex; gap:10px; flex-wrap:wrap; align-items:center;}
+  .muted{color:var(--text-dim); font-size:12.5px;}
+  hr.sep{border:none; border-top:1px solid var(--border); margin:20px 0;}
+  .switch{position:relative; width:42px; height:24px; display:inline-block;}
+  .switch input{opacity:0; width:0; height:0;}
+  .slider{position:absolute; inset:0; background:var(--border); border-radius:24px; cursor:pointer; transition:.2s;}
+  .slider:before{content:""; position:absolute; width:18px; height:18px; left:3px; top:3px; background:#fff; border-radius:50%; transition:.2s;}
+  .switch input:checked + .slider{background:var(--accent);}
+  .switch input:checked + .slider:before{transform:translateX(18px);}
+  .foot-row td{
+    font-weight:800; background:var(--accent-dim); font-size:15.5px; padding:14px 8px;
+    border-top:2px solid var(--accent); color:var(--text);
+  }
+  .foot-row td:first-child{color:var(--accent); letter-spacing:.2px;}
+  .foot-row td.pos{color:var(--green);}
+  .foot-row td.neg{color:var(--red);}
+  .foot-row-projected td{
+    font-size:13px; font-weight:600; background:var(--bg); color:var(--text-dim);
+    border-top:1px dashed var(--border); font-style:italic;
+  }
+  .foot-row-projected td:first-child{color:var(--text-dim);}
+  .foot-row-projected td.pos{color:var(--green);}
+  .foot-row-projected td.neg{color:var(--red);}
+
+  @media print{
+    nav, header .header-actions, .no-print{display:none !important;}
+    body{background:#fff; color:#000;}
+    main{padding:0;}
+    .card{box-shadow:none; border:1px solid #ccc;}
+    table{min-width:0;}
+    .table-wrap{max-height:none; overflow:visible;}
+    th{position:static;}
+  }
+  @media (max-width:640px){
+    header h1{font-size:16px;}
+    .month-nav .title{min-width:130px; font-size:15px;}
+  }
+
+  #authOverlay{
+    position:fixed; inset:0; background:var(--bg); z-index:200;
+    display:flex; align-items:center; justify-content:center; padding:20px;
+  }
+  #authOverlay.hidden{display:none;}
+  .auth-card{width:100%; max-width:360px;}
+  .auth-card h2{margin-bottom:4px;}
+  .auth-card .field{margin-top:12px;}
+  .auth-card .btn{width:100%; justify-content:center; margin-top:16px;}
+  .auth-card .switch-mode{margin-top:14px; text-align:center; font-size:13px; color:var(--text-dim);}
+  .auth-card .switch-mode a{color:var(--accent); cursor:pointer; text-decoration:underline;}
+  .auth-error{color:var(--red); font-size:13px; margin-top:10px; min-height:0;}
+  #app-root.hidden{display:none;}
+  .user-email{font-size:12.5px; color:var(--text-dim); margin-right:2px;}
+</style>
+</head>
+<body>
+
+<div id="authOverlay" class="hidden">
+  <div class="card auth-card">
+    <h2 id="authTitle">Anmelden</h2>
+    <p class="muted">Melde dich an, um deine Zeiterfassungsdaten geräteübergreifend zu speichern.</p>
+    <div class="field"><label>E-Mail</label><input type="text" id="authEmail" autocomplete="username"></div>
+    <div class="field"><label>Passwort</label><input type="password" id="authPassword" autocomplete="current-password"></div>
+    <button class="btn" id="authSubmitBtn">Anmelden</button>
+    <div class="auth-error" id="authError"></div>
+    <div class="switch-mode" id="authSwitchMode">Noch kein Konto? <a id="authSwitchLink">Registrieren</a></div>
+  </div>
+</div>
+
+<div id="app-root" class="hidden">
+
+<header>
+  <h1><span class="dot"></span>Zeiterfassung</h1>
+  <div class="header-actions no-print">
+    <span class="user-email" id="userEmailLabel"></span>
+    <button class="btn ghost small" id="logoutBtn">Abmelden</button>
+    <label class="switch" title="Dark Mode">
+      <input type="checkbox" id="darkToggle">
+      <span class="slider"></span>
+    </label>
+    <button class="btn ghost small" onclick="window.print()">🖨 Drucken</button>
+  </div>
+</header>
+
+<nav id="tabNav">
+  <button data-tab="dashboard" class="active">Dashboard</button>
+  <button data-tab="monat">Monatsansicht</button>
+  <button data-tab="schichten">Schichten</button>
+  <button data-tab="abwesenheiten">Abwesenheiten</button>
+  <button data-tab="einstellungen">Einstellungen &amp; Daten</button>
+</nav>
+
+<main>
+
+  <!-- DASHBOARD -->
+  <section class="view active" id="view-dashboard">
+    <div class="dash-layout">
+      <div class="dash-left">
+        <div class="grid-dash" id="dashGrid"></div>
+        <h3 style="margin-top:20px;">Jahresstatistik <span class="muted" id="statYearLabel" style="text-transform:none; letter-spacing:0; font-weight:500;"></span></h3>
+        <div class="grid-dash" id="yearStatsGrid"></div>
+      </div>
+      <div class="dash-right card">
+        <h2>Schichten im Jahr</h2>
+        <div class="table-wrap dash-table-wrap" style="border:none; box-shadow:none;">
+          <table style="min-width:0;">
+            <thead><tr><th>Schicht</th><th>Anzahl Tage</th><th>Gesamtzeit</th></tr></thead>
+            <tbody id="shiftStatsBody"></tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- MONATSANSICHT -->
+  <section class="view" id="view-monat">
+    <div class="month-nav no-print">
+      <button class="btn ghost small" id="prevMonth">‹ Zurück</button>
+      <div class="title" id="monthTitle"></div>
+      <button class="btn ghost small" id="nextMonth">Weiter ›</button>
+      <button class="btn secondary small" id="todayMonth">Heute</button>
+      <button class="btn secondary small" id="jumpNextOpenBtn" style="display:none;">→ Weiter beim Nachtragen</button>
+      <div class="spacer" style="flex:1"></div>
+      <span class="muted" id="uebertragInfo"></span>
+    </div>
+    <div class="legend">
+      <span><span class="swatch" style="background:var(--bg);border:1px solid var(--border)"></span>Wochenende</span>
+      <span><span class="swatch" style="background:var(--amber-bg)"></span>Feiertag</span>
+      <span><span class="swatch" style="outline:2px solid var(--accent)"></span>Heute</span>
+      <span><span class="swatch" style="box-shadow:inset 3px 0 0 var(--accent);border:1px solid var(--border)"></span>Nächster offener Nachtrag</span>
+    </div>
+    <div class="table-wrap">
+      <table>
+        <thead>
+          <tr>
+            <th>Datum</th><th>Typ</th><th>Schicht</th><th>Planzeit</th><th>Bereitschaft</th><th>Zeiten (Kommen–Gehen)</th><th>Zeitzugang</th><th>Ist</th><th>+/-</th><th>Kontostand</th><th>Bemerkung</th>
+          </tr>
+        </thead>
+        <tbody id="monthBody"></tbody>
+        <tfoot>
+          <tr class="foot-row">
+            <td colspan="3">Monatssumme</td>
+            <td id="footPlanzeit">–</td>
+            <td></td>
+            <td></td>
+            <td></td>
+            <td id="footIst">–</td>
+            <td id="footSaldo">–</td>
+            <td id="footKontostand">–</td>
+            <td></td>
+          </tr>
+          <tr class="foot-row foot-row-projected">
+            <td colspan="7">Prognose Monatsende <span class="muted" style="font-weight:500; text-transform:none; letter-spacing:0;">(Stempeldaten wo vorhanden, sonst Planwert)</span></td>
+            <td id="footIstProjected">–</td>
+            <td id="footSaldoProjected">–</td>
+            <td></td>
+            <td></td>
+          </tr>
+        </tfoot>
+      </table>
+    </div>
+    <p class="muted" style="margin-top:8px;">„Kontostand" zeigt die laufende Berechnung deiner Stunden zu diesem Zeitpunkt – also den Saldo inklusive Startsaldo, aufsummiert bis einschließlich des jeweiligen Tages. Stempelst du beim ersten Zeitpaar des Tages mehr als 10 Minuten vor Beginn der ausgewählten Schicht ein, zählt für die Berechnung nur die Zeit ab „Schichtbeginn − 10 Minuten“ – ein kleiner Hinweis zeigt dir dann die gekappte Zeit an (bei der Schicht mit Kürzel „SD“ entfällt diese Kappung, dort zählt immer die tatsächliche Stempelzeit). Die Monatssumme unten enthält zusätzlich die gesamte geplante Schichtzeit (Planzeit) des Monats. Bei „Bereitschaft“ kannst du pro Tag mehrere Bereitschaftstypen gleichzeitig markieren – das fließt nicht in Soll/Ist/Saldo ein, sondern ist reine Zusatzinfo. An Feiertagen kannst du ganz normal Schicht und Zeiten eintragen; die Sollzeit bleibt dabei 0, außer du trägst im Feld „Soll (Std)“ bei diesem Tag bewusst einen eigenen Wert ein. Der Typ steht standardmäßig auf „Arbeit/Frei (automatisch)“ – sobald du eine Schicht auswählst, wird automatisch „Arbeit“ daraus, ohne Schicht bleibt es „Frei“. Nur für Urlaub oder Krankenstand wählst du den Typ bewusst manuell aus; bei Krankenstand kannst du zusätzlich eine Schicht angeben, dann wird die Ist-Zeit automatisch auf deren Dauer gesetzt (Soll bleibt normal). „Zeitzugang" addiert einen frei eingegebenen Stundenwert (hh:mm) zur Ist-Zeit des Tages, egal welcher Typ eingetragen ist.</p>
+  </section>
+
+  <!-- SCHICHTEN -->
+  <section class="view" id="view-schichten">
+    <div class="card">
+      <h2>Neue Schicht anlegen</h2>
+      <div class="form-grid">
+        <div class="field"><label>Name</label><input type="text" id="shiftName" placeholder="z. B. Frühdienst"></div>
+        <div class="field"><label>Kürzel (optional)</label><input type="text" id="shiftKuerzel" placeholder="z. B. FD" maxlength="6"></div>
+        <div class="field"><label>Beginn</label><input type="text" inputmode="numeric" class="time-field" id="shiftStart" value="06:00" placeholder="hh:mm"></div>
+        <div class="field"><label>Ende</label><input type="text" inputmode="numeric" class="time-field" id="shiftEnd" value="14:00" placeholder="hh:mm"></div>
+        <div class="field" style="display:flex; align-items:flex-end;"><button class="btn" id="addShiftBtn">Schicht hinzufügen</button></div>
+      </div>
+      <p class="muted">Endet die Zeit vor dem Beginn oder genau um Mitternacht (z. B. 22:00–06:00 oder 16:00–00:00), wird automatisch als Nachtschicht über Mitternacht erkannt. Das Kürzel wird für die Jahresstatistik im Dashboard verwendet (z. B. „SD" für Spätdienst).</p>
+    </div>
+    <h3>Vorhandene Schichten</h3>
+    <p class="muted">Mit den Pfeilen kannst du die Reihenfolge der Schichten ändern – sie bestimmt die Sortierung in den Auswahllisten.</p>
+    <div class="shift-list" id="shiftList"></div>
+    <div class="row-gap" style="margin-top:14px;">
+      <button class="btn secondary small" id="loadDefaultShifts">Standard-Schichten laden</button>
+    </div>
+  </section>
+
+  <!-- ABWESENHEITEN -->
+  <section class="view" id="view-abwesenheiten">
+    <div class="abw-summary" id="abwSummary"></div>
+    <div class="card">
+      <h2>Dienstplan – Schicht für Zeitraum setzen</h2>
+      <p class="muted">Zum schnellen Abtippen eines Dienstplans: Zeitraum wählen, Schicht (und optional Bereitschaft) auswählen und übernehmen – bestehende Stempelzeiten in diesem Zeitraum bleiben unangetastet.</p>
+      <div class="form-grid">
+        <div class="field"><label>Von</label><input type="date" id="dpVon"></div>
+        <div class="field"><label>Bis</label><input type="date" id="dpBis"></div>
+        <div class="field">
+          <label>Schicht</label>
+          <select id="dpSchicht"></select>
+        </div>
+        <div class="field" style="display:flex; align-items:flex-end; gap:8px;">
+          <label style="display:flex; align-items:center; gap:6px; font-size:13px; color:var(--text-dim); font-weight:500;">
+            <input type="checkbox" id="dpNurWerktage" style="width:auto;"> nur Werktage
+          </label>
+        </div>
+      </div>
+      <div class="field" style="margin-top:10px;">
+        <label>Bereitschaft (optional, für alle Tage im Zeitraum)</label>
+        <div class="row-gap" id="dpBereitschaft"></div>
+      </div>
+      <button class="btn" id="dpApplyBtn" style="margin-top:12px;">Übernehmen</button>
+      <p class="muted" id="dpHint" style="margin-top:8px;"></p>
+    </div>
+    <div class="card">
+      <h2>Zeitraum als Abwesenheit eintragen</h2>
+      <div class="form-grid">
+        <div class="field"><label>Von</label><input type="date" id="abwVon"></div>
+        <div class="field"><label>Bis</label><input type="date" id="abwBis"></div>
+        <div class="field">
+          <label>Typ</label>
+          <select id="abwTyp">
+            <option value="urlaub">Urlaub</option>
+            <option value="krankenstand">Krankenstand</option>
+            <option value="">Zurücksetzen (Arbeit/Frei automatisch)</option>
+          </select>
+        </div>
+        <div class="field" style="display:flex; align-items:flex-end; gap:8px;">
+          <label style="display:flex; align-items:center; gap:6px; font-size:13px; color:var(--text-dim); font-weight:500;">
+            <input type="checkbox" id="abwNurWerktage" checked style="width:auto;"> nur Werktage
+          </label>
+        </div>
+      </div>
+      <button class="btn" id="abwApplyBtn" style="margin-top:12px;">Übernehmen</button>
+      <p class="muted" id="abwHint" style="margin-top:8px;"></p>
+    </div>
+    <div class="card" style="margin-top:16px;">
+      <h2>Erkannte Feiertage im aktuellen Jahr</h2>
+      <div id="holidayList" class="muted"></div>
+    </div>
+  </section>
+
+  <!-- EINSTELLUNGEN -->
+  <section class="view" id="view-einstellungen">
+    <div class="card">
+      <h2>Grundeinstellungen</h2>
+      <div class="form-grid">
+        <div class="field"><label>Startsaldo (Stunden)</label><input type="number" step="0.01" id="setStartsaldo"></div>
+        <div class="field"><label>Startdatum</label><input type="date" id="setStartdatum"></div>
+        <div class="field"><label>Sollstunden pro Werktag (bei 100 %)</label><input type="number" step="0.25" id="setSollstunden"></div>
+        <div class="field"><label>Urlaubsanspruch (Tage/Jahr)</label><input type="number" step="1" id="setUrlaubsanspruch"></div>
+      </div>
+      <button class="btn" id="saveSettingsBtn" style="margin-top:12px;">Speichern</button>
+    </div>
+
+    <hr class="sep">
+
+    <div class="card">
+      <h2>Beschäftigungsgrad pro Monat</h2>
+      <p class="muted">Standardmäßig gilt 100 % (Vollzeit) für jeden Monat. Trage hier abweichende Monate ein (z. B. bei Teilzeit oder Elternteilzeit) – die Sollzeit pro Werktag wird für diesen Monat entsprechend anteilig berechnet.</p>
+      <div class="form-grid">
+        <div class="field"><label>Monat</label><input type="month" id="bgMonat" placeholder="JJJJ-MM, z. B. 2026-08"></div>
+        <div class="field"><label>Beschäftigungsgrad (%)</label><input type="number" step="1" min="1" max="100" id="bgProzent" value="100"></div>
+        <div class="field" style="display:flex; align-items:flex-end;"><button class="btn" id="bgAddBtn">Speichern</button></div>
+      </div>
+      <div class="shift-list" id="bgList" style="margin-top:14px;"></div>
+    </div>
+
+    <hr class="sep">
+
+    <div class="card">
+      <h2>Datensicherung</h2>
+      <div class="row-gap">
+        <button class="btn secondary" id="exportJsonBtn">⬇ JSON Export</button>
+        <label class="btn secondary" style="cursor:pointer;">⬆ JSON Import
+          <input type="file" id="importJsonInput" accept="application/json" style="display:none;">
+        </label>
+        <button class="btn secondary" id="exportCsvBtn">⬇ CSV Export (aktueller Monat)</button>
+        <button class="btn danger" id="clearAllBtn">🗑 Alles löschen</button>
+      </div>
+      <p class="muted" style="margin-top:10px;">Alle Daten werden automatisch gespeichert. Der JSON-Export enthält Einstellungen, Schichten und alle erfassten Tage – ideal als Backup.</p>
+    </div>
+
+    <hr class="sep">
+
+    <div class="card">
+      <h2>Kalender-Export</h2>
+      <div class="row-gap">
+        <div class="field" style="min-width:160px;">
+          <label>Monat</label>
+          <input type="month" id="icalMonth">
+        </div>
+        <div class="field" style="display:flex; align-items:flex-end;">
+          <button class="btn secondary" id="exportIcalBtn">⬇ iCal Export (.ics)</button>
+        </div>
+      </div>
+      <p class="muted" style="margin-top:10px;">Erstellt eine .ics-Datei mit einem Termin je Tag mit eingetragener Schicht (Titel „L " + Schichtname, Zeiten der Schicht, Farbe Gelb). Ob die Farbe angezeigt wird, hängt von deiner Kalender-App ab – Apple Kalender zeigt sie z. B. an, Google Kalender ignoriert sie beim Import meist.</p>
+    </div>
+  </section>
+
+</main>
+
+<div class="toast" id="toast"></div>
+
+</div><!-- /#app-root -->
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
+<script>
+(function(){
+"use strict";
+
+/* ---------- Supabase-Konfiguration ----------
+   Projekt-URL und Public-Anon-Key aus den Supabase-Projekteinstellungen
+   (Project Settings -> API). Der Anon-Key ist bewusst öffentlich im Frontend-
+   Code sichtbar - das ist bei Supabase so vorgesehen, der eigentliche Schutz
+   passiert über Row Level Security (siehe SQL-Setup). */
+const SUPABASE_URL = 'https://iznqilomuvbaqeqwrqsc.supabase.co';
+const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Iml6bnFpbG9tdXZiYXFlcXdycXNjIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODUyNjM0NDMsImV4cCI6MjEwMDgzOTQ0M30.YqhQpTDcLq-GAMTslUDvkn_WSH4Ocj3TJdb5JYYx4YQ';
+const sb = (SUPABASE_URL.startsWith('http') && window.supabase)
+  ? window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY)
+  : null;
+let currentUser = null;
+
+/* ---------- Konstanten & Defaults ---------- */
+const ABW_LABELS = {
+  arbeit:'Arbeit', frei:'Frei', urlaub:'Urlaub', krankenstand:'Krankenstand', feiertag:'Feiertag'
+};
+/* Typen, die rechnerisch identisch behandelt werden (Soll normal, Ist aus
+   den Zeitpaaren) - "Frei" ist nur die Standardauswahl vor einer bewussten
+   Zuordnung und hat keinerlei anderen Effekt auf die Berechnung als "Arbeit". */
+const WORK_LIKE_TYPES = ['arbeit','frei'];
+const WOCHENTAGE = ['So','Mo','Di','Mi','Do','Fr','Sa'];
+const MONATE = ['Jänner','Februar','März','April','Mai','Juni','Juli','August','September','Oktober','November','Dezember'];
+
+/* Feste Bereitschaftstypen - im Gegensatz zu Schichten nicht frei anlegbar.
+   Reine Zusatzinfo, wirkt sich nicht auf Soll/Ist/Saldo aus. */
+const BEREITSCHAFT_TYPES = [
+  {code:'ELB', start:'17:00', end:'07:00'},
+  {code:'BN', start:'19:00', end:'07:00'},
+  {code:'BT', start:'19:00', end:'07:00'}
+];
+/* Bei Urlaub gibt es keine echte Schicht, die Planzeit wird zur einheitlichen
+   Anzeige (analog zu den anderen Tagen) auf einen festen Rahmen gesetzt. */
+const URLAUB_PLANZEIT_START = '08:00', URLAUB_PLANZEIT_END = '16:00';
+
+const DEFAULT_STATE = {
+  settings:{
+    startsaldo: 0,
+    startdatum: fmtDate(new Date()),
+    sollstundenTag: 8,
+    urlaubsanspruch: 25,
+    darkMode: false
+  },
+  shifts:[],
+  days:{},
+  /* Beschäftigungsgrad pro Monat in Prozent, Schlüssel "YYYY-MM". Fehlt ein
+     Monat, gilt automatisch 100 % (Vollzeit). Skaliert die Sollzeit pro
+     Werktag in diesem Monat (z. B. 50 % bei sollstundenTag=8 -> 4 Std Soll/Tag). */
+  beschaeftigungsgrad:{}
+};
+
+let state = JSON.parse(JSON.stringify(DEFAULT_STATE));
+let viewYear, viewMonth; // 0-indexiert
+let saveTimer = null;
+const STORAGE_KEY = 'zeiterfassung-state-v1';
+
+/* ---------- Datum/Zeit Helfer ---------- */
+function pad(n){ return String(n).padStart(2,'0'); }
+function fmtDate(d){ return d.getFullYear()+'-'+pad(d.getMonth()+1)+'-'+pad(d.getDate()); }
+function parseLocalDate(str){ const [y,m,d]=str.split('-').map(Number); return new Date(y,m-1,d); }
+function addDaysToDate(d, n){ const nd=new Date(d); nd.setDate(nd.getDate()+n); return nd; }
+function todayStr(){ return fmtDate(new Date()); }
+
+function fmtHM(mins){
+  const sign = mins < 0 ? '-' : '';
+  const abs = Math.round(Math.abs(mins));
+  const h = Math.floor(abs/60), m = abs % 60;
+  return sign + h + ':' + pad(m);
+}
+function fmtHMSigned(mins){
+  const rounded = Math.round(mins);
+  if(rounded === 0) return '±0:00';
+  return (rounded>0?'+':'-') + Math.floor(Math.abs(rounded)/60) + ':' + pad(Math.abs(rounded)%60);
+}
+
+/* Wandelt tippfreundliche Kurzformen in ein sauberes HH:MM um, z. B.
+   "645" oder "0645" oder "6:45" -> "06:45". So lassen sich beide Ziffern
+   der Minute am Stück eintippen, ohne dass ein Zeit-Widget-Segment im Weg
+   steht. Nicht interpretierbare Eingaben werden zu einem leeren String. */
+/* Erkennt gängige Monats-Schreibweisen (JJJJ-MM, JJJJ-M, MM.JJJJ, MM/JJJJ,
+   M/JJJJ ...) und normalisiert sie auf das interne Format "JJJJ-MM" - nötig,
+   weil <input type="month"> in manchen Browsern (z. B. Firefox Desktop) als
+   normales Textfeld ohne native Formatvorgabe dargestellt wird. */
+function normalizeMonatStr(raw){
+  if(raw==null) return '';
+  const s = String(raw).trim();
+  if(!s) return '';
+  let m = s.match(/^(\d{4})[-./](\d{1,2})$/);
+  if(m){
+    const year = parseInt(m[1],10), month = parseInt(m[2],10);
+    if(month>=1 && month<=12) return year+'-'+pad(month);
+    return '';
+  }
+  m = s.match(/^(\d{1,2})[-./](\d{4})$/);
+  if(m){
+    const month = parseInt(m[1],10), year = parseInt(m[2],10);
+    if(month>=1 && month<=12) return year+'-'+pad(month);
+    return '';
+  }
+  return '';
+}
+function normalizeTimeStr(raw){
+  if(raw==null) return '';
+  let s = String(raw).trim();
+  if(!s) return '';
+  s = s.replace(/[.,]/g, ':');
+  if(/^\d{1,4}$/.test(s)){
+    if(s.length<=2) s = s + ':00';
+    else if(s.length===3) s = '0'+s[0]+':'+s.slice(1);
+    else s = s.slice(0,2)+':'+s.slice(2);
+  }
+  const m = s.match(/^(\d{1,2}):(\d{1,2})$/);
+  if(!m) return '';
+  const h = parseInt(m[1],10), mnt = parseInt(m[2],10);
+  if(h>23 || mnt>59) return '';
+  return pad(h)+':'+pad(mnt);
+}
+
+function workedMinutes(kommen, gehen){
+  if(!kommen || !gehen) return 0;
+  const [h1,m1] = kommen.split(':').map(Number);
+  const [h2,m2] = gehen.split(':').map(Number);
+  let start = h1*60+m1, end = h2*60+m2;
+  if(end <= start) end += 24*60;
+  return end - start;
+}
+
+/* ---------- Österreichische Feiertage ---------- */
+function getEasterSunday(year){
+  const a = year % 19, b = Math.floor(year/100), c = year % 100;
+  const d = Math.floor(b/4), e = b % 4, f = Math.floor((b+8)/25);
+  const g = Math.floor((b-f+1)/3), h = (19*a+b-d-g+15)%30;
+  const i = Math.floor(c/4), k = c % 4, l = (32+2*e+2*i-h-k)%7;
+  const m = Math.floor((a+11*h+22*l)/451);
+  const month = Math.floor((h+l-7*m+114)/31);
+  const day = ((h+l-7*m+114)%31)+1;
+  return new Date(year, month-1, day);
+}
+const holidayCache = {};
+function getHolidaysForYear(year){
+  if(holidayCache[year]) return holidayCache[year];
+  const easter = getEasterSunday(year);
+  const map = {};
+  [[0,1,'Neujahr'],[0,6,'Heilige Drei Könige'],[4,1,'Staatsfeiertag'],
+   [7,15,'Mariä Himmelfahrt'],[9,26,'Nationalfeiertag'],[10,1,'Allerheiligen'],
+   [11,8,'Mariä Empfängnis'],[11,25,'Christtag'],[11,26,'Stefanitag']
+  ].forEach(([m,d,name])=>{ map[fmtDate(new Date(year,m,d))] = name; });
+  [[1,'Ostermontag'],[39,'Christi Himmelfahrt'],[50,'Pfingstmontag'],[60,'Fronleichnam']]
+  .forEach(([off,name])=>{ map[fmtDate(addDaysToDate(easter,off))] = name; });
+  holidayCache[year] = map;
+  return map;
+}
+function getHoliday(dateStr){
+  const year = parseInt(dateStr.slice(0,4),10);
+  return getHolidaysForYear(year)[dateStr] || null;
+}
+
+/* ---------- Tagesberechnung ---------- */
+function getSegments(entry){
+  if(!entry) return [{kommen:'',gehen:''}];
+  if(entry.stempel && entry.stempel.length) return entry.stempel;
+  if(entry.kommen || entry.gehen) return [{kommen:entry.kommen||'', gehen:entry.gehen||''}];
+  return [{kommen:'',gehen:''}];
+}
+function sumSegmentsMinutes(segments){
+  return segments.reduce((acc,seg)=>acc+workedMinutes(seg.kommen,seg.gehen), 0);
+}
+
+/* Wird mehr als KOMMEN_CAP_MINUTES vor Schichtbeginn eingestempelt, zählt für
+   die Berechnung nur die Zeit ab "Schichtbeginn minus KOMMEN_CAP_MINUTES".
+   Gilt nur für das erste Zeitpaar des Tages und nur, wenn eine Schicht
+   ausgewählt ist. */
+const KOMMEN_CAP_MINUTES = 10;
+function capEarlyKommen(kommen, shiftStart){
+  if(!kommen || !shiftStart) return {effective: kommen, capped:false};
+  const kommenMin = timeToNum(kommen);
+  const shiftStartMin = timeToNum(shiftStart);
+  const diff = shiftStartMin - kommenMin;
+  if(diff > KOMMEN_CAP_MINUTES){
+    let cappedMin = shiftStartMin - KOMMEN_CAP_MINUTES;
+    if(cappedMin < 0) cappedMin += 24*60;
+    return {effective: pad(Math.floor(cappedMin/60))+':'+pad(cappedMin%60), capped:true};
+  }
+  return {effective: kommen, capped:false};
+}
+
+function getDayInfo(dateStr){
+  const d = parseLocalDate(dateStr);
+  const dow = d.getDay();
+  const isWeekend = dow===0 || dow===6;
+  const holidayName = getHoliday(dateStr);
+  const entry = state.days[dateStr] || {};
+  const beschaeftigungsgrad = getBeschaeftigungsgrad(dateStr);
+  const sollTag = state.settings.sollstundenTag * 60 * (beschaeftigungsgrad/100);
+  const segments = getSegments(entry);
+  const shift = state.shifts.find(s=>s.id===(entry.shiftId||''));
+
+  let typ = entry.typ || 'frei';
+  if(holidayName && !['urlaub','krankenstand'].includes(typ)) typ = 'feiertag';
+
+  const hasSollOverride = entry.sollOverride!=null && entry.sollOverride!=='' && !isNaN(Number(entry.sollOverride));
+  let soll = 0;
+  if(holidayName){
+    // An einem Feiertag gibt es grundsätzlich keine Sollzeit, außer für diesen
+    // Tag wurde bewusst ein eigener Wert eingetragen - das gilt unabhängig
+    // davon, ob der Typ Feiertag, Urlaub oder Krankenstand ist.
+    soll = hasSollOverride ? Math.round(Number(entry.sollOverride)*60) : 0;
+  } else if(!isWeekend){
+    soll = sollTag;
+  }
+
+  let ist = 0;
+  let kommenCapped = false, kommenCappedTo = null;
+  if(typ === 'urlaub'){
+    ist = soll;
+  } else if(typ === 'krankenstand'){
+    ist = shift ? workedMinutes(shift.start, shift.end) : 0;
+  } else if(WORK_LIKE_TYPES.includes(typ) || typ==='feiertag'){
+    const isSD = shift && (shift.kuerzel||'').trim().toUpperCase()==='SD';
+    ist = segments.reduce((acc,seg,idx)=>{
+      if(idx===0 && shift && seg.kommen && !isSD){
+        const cap = capEarlyKommen(seg.kommen, shift.start);
+        if(cap.capped){ kommenCapped = true; kommenCappedTo = cap.effective; }
+        return acc + workedMinutes(cap.effective, seg.gehen);
+      }
+      return acc + workedMinutes(seg.kommen, seg.gehen);
+    }, 0);
+  }
+  const zeitzugang = entry.zeitzugang || '';
+  if(zeitzugang){ ist += timeToNum(zeitzugang); }
+  const planzeitMinutes = typ==='urlaub'
+    ? workedMinutes(URLAUB_PLANZEIT_START, URLAUB_PLANZEIT_END)
+    : (((WORK_LIKE_TYPES.includes(typ) || typ==='feiertag' || typ==='krankenstand') && shift) ? workedMinutes(shift.start, shift.end) : 0);
+  const saldo = ist - soll;
+  return {
+    dateStr, dow, isWeekend, holidayName, typ, soll, ist, saldo, planzeitMinutes,
+    shiftId: entry.shiftId || '', segments, kommenCapped, kommenCappedTo, zeitzugang,
+    bereitschaft: entry.bereitschaft || [],
+    sollOverride: (entry.sollOverride!=null ? entry.sollOverride : ''),
+    bemerkung: entry.bemerkung || '',
+    beschaeftigungsgrad
+  };
+}
+function getBeschaeftigungsgrad(dateStr){
+  const monthKey = dateStr.slice(0,7);
+  const val = state.beschaeftigungsgrad ? state.beschaeftigungsgrad[monthKey] : null;
+  return (val!=null && !isNaN(Number(val))) ? Number(val) : 100;
+}
+
+function dateRange(startStr, endStr){
+  const dates = [];
+  let cur = parseLocalDate(startStr);
+  const end = parseLocalDate(endStr);
+  while(cur <= end){ dates.push(fmtDate(cur)); cur.setDate(cur.getDate()+1); }
+  return dates;
+}
+function sumSaldo(startStr, endStr){
+  if(startStr > endStr) return 0;
+  return dateRange(startStr,endStr).reduce((acc,d)=>acc+getDayInfo(d).saldo, 0);
+}
+function getBalanceUpTo(dateStr){
+  const start = state.settings.startdatum;
+  const startsaldoMin = state.settings.startsaldo * 60;
+  if(dateStr < start) return startsaldoMin;
+  return startsaldoMin + sumSaldo(start, dateStr);
+}
+
+/* Fortschritt beim Nachtragen der Stempeldaten: der früheste Tag (ab
+   Startdatum, bis einschließlich heute) mit geplanter Schicht laut
+   Dienstplan, der noch keine Kommen/Gehen-Zeiten hat. So weiß man beim
+   nächsten Öffnen sofort, wo man weitermachen muss. */
+function needsStamping(dateStr){
+  const info = getDayInfo(dateStr);
+  if(!info.shiftId) return false;
+  if(['urlaub','krankenstand'].includes(info.typ)) return false;
+  return !info.segments.some(s=>s.kommen && s.gehen);
+}
+function findNextOpenDate(){
+  const start = state.settings.startdatum;
+  const end = todayStr();
+  if(start > end) return null;
+  const dates = dateRange(start, end);
+  for(let i=0; i<dates.length; i++){
+    if(needsStamping(dates[i])) return dates[i];
+  }
+  return null;
+}
+function getMonthDates(year, monthIdx){
+  const days=[]; const last = new Date(year, monthIdx+1, 0).getDate();
+  for(let dnum=1; dnum<=last; dnum++) days.push(fmtDate(new Date(year,monthIdx,dnum)));
+  return days;
+}
+function getMonthStats(year, monthIdx, upToToday){
+  let dates = getMonthDates(year, monthIdx);
+  if(upToToday){ const t = todayStr(); dates = dates.filter(d=>d<=t); }
+  let soll=0, ist=0, planzeit=0;
+  dates.forEach(d=>{ const info=getDayInfo(d); soll+=info.soll; ist+=info.ist; planzeit+=info.planzeitMinutes; });
+  return {soll, ist, saldo: ist-soll, planzeit};
+}
+
+/* Prognose zum Monatsende: für Tage mit bereits eingetragenen Stempeldaten
+   zählt die tatsächliche Ist-Zeit, für noch offene (geplante, aber nicht
+   gestempelte) Tage der Planwert laut Schicht - so sieht man, wie der Saldo
+   aussehen würde, wenn alles wie geplant läuft. */
+function getMonthProjectedStats(year, monthIdx){
+  const dates = getMonthDates(year, monthIdx);
+  let soll=0, ist=0;
+  dates.forEach(d=>{
+    const info = getDayInfo(d);
+    soll += info.soll;
+    ist += needsStamping(d) ? (info.planzeitMinutes + info.ist) : info.ist;
+  });
+  return {soll, ist, saldo: ist-soll};
+}
+
+/* ---------- Persistenz ---------- */
+/* Primärer Speicher ist Supabase (pro angemeldetem Nutzer eine Zeile in der
+   Tabelle zeiterfassung_state). localStorage dient nur als Offline-
+   Zwischenspeicher/Fallback, z. B. wenn kein Supabase konfiguriert ist oder
+   das Netzwerk gerade nicht erreichbar ist. */
+function applyLoadedState(loaded){
+  state = Object.assign(JSON.parse(JSON.stringify(DEFAULT_STATE)), loaded);
+  state.settings = Object.assign(JSON.parse(JSON.stringify(DEFAULT_STATE.settings)), loaded.settings||{});
+  if(!state.shifts || state.shifts.length===0){
+    state.shifts = defaultShifts();
+  }
+}
+function loadStateFromLocalStorage(){
+  try{
+    const v = window.localStorage.getItem(STORAGE_KEY);
+    if(v) applyLoadedState(JSON.parse(v));
+  }catch(e){ console.warn('Lokaler Speicher nicht verfügbar', e); }
+}
+function saveStateToLocalStorage(){
+  try{ window.localStorage.setItem(STORAGE_KEY, JSON.stringify(state)); return true; }
+  catch(e){ console.warn('Lokaler Speicher nicht verfügbar', e); return false; }
+}
+
+async function loadState(){
+  if(sb && currentUser){
+    try{
+      const {data, error} = await sb.from('zeiterfassung_state').select('data').eq('user_id', currentUser.id).maybeSingle();
+      if(error) throw error;
+      if(data && data.data){
+        applyLoadedState(data.data);
+        saveStateToLocalStorage(); // lokale Kopie als Offline-Cache aktualisieren
+        if(!state.shifts || state.shifts.length===0) state.shifts = defaultShifts();
+        return;
+      }
+      // Kein Datensatz in Supabase - evtl. lokale Daten aus früherer Nutzung übernehmen
+      const localRaw = window.localStorage.getItem(STORAGE_KEY);
+      if(localRaw){
+        applyLoadedState(JSON.parse(localRaw));
+        await saveState();
+        showToast('Lokale Daten wurden zu deinem Konto hochgeladen');
+      } else if(!state.shifts || state.shifts.length===0){
+        state.shifts = defaultShifts();
+      }
+      return;
+    }catch(e){
+      console.warn('Supabase nicht erreichbar, nutze lokalen Speicher', e);
+      showToast('Kein Zugriff auf Online-Speicher – nutze lokale Daten');
+    }
+  }
+  loadStateFromLocalStorage();
+  if(!state.shifts || state.shifts.length===0){
+    state.shifts = defaultShifts();
+  }
+}
+function scheduleSave(){
+  clearTimeout(saveTimer);
+  saveTimer = setTimeout(saveState, 400);
+}
+async function saveState(){
+  saveStateToLocalStorage();
+  if(sb && currentUser){
+    try{
+      const {error} = await sb.from('zeiterfassung_state').upsert({
+        user_id: currentUser.id, data: state, updated_at: new Date().toISOString()
+      });
+      if(error) throw error;
+    }catch(e){
+      console.warn('Speichern in Supabase fehlgeschlagen, lokal gesichert', e);
+      showToast('Online-Speichern fehlgeschlagen – lokal gesichert');
+    }
+  }
+}
+
+function defaultShifts(){
+  return [
+    {id:'s1', name:'Frühdienst', kuerzel:'FD', start:'06:00', end:'14:00', isNight:false},
+    {id:'s2', name:'Tagdienst', kuerzel:'TD', start:'08:00', end:'16:00', isNight:false},
+    {id:'s3', name:'Spätdienst', kuerzel:'SD', start:'14:00', end:'22:00', isNight:false},
+    {id:'s4', name:'Nachtdienst', kuerzel:'ND', start:'22:00', end:'06:00', isNight:true}
+  ];
+}
+function uid(){ return 'id'+Date.now().toString(36)+Math.random().toString(36).slice(2,7); }
+
+/* ---------- Toast ---------- */
+let toastTimer=null;
+function showToast(msg){
+  const t = document.getElementById('toast');
+  t.textContent = msg;
+  t.classList.add('show');
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(()=>t.classList.remove('show'), 2200);
+}
+
+/* ---------- Rendering: Dashboard ---------- */
+function renderDashboard(){
+  const grid = document.getElementById('dashGrid');
+  const now = new Date();
+  const startsaldoMin = state.settings.startsaldo*60;
+  const kontostand = getBalanceUpTo(todayStr());
+  const monatVoll = getMonthStats(now.getFullYear(), now.getMonth(), false);
+  const monatBisHeute = getMonthStats(now.getFullYear(), now.getMonth(), true);
+  const jahresStart = fmtDate(new Date(now.getFullYear(),0,1));
+  const jahreskonto = sumSaldo(jahresStart > state.settings.startdatum ? jahresStart : state.settings.startdatum, todayStr());
+
+  const urlaubJahr = Object.keys(state.days).filter(d=>{
+    return d.startsWith(String(now.getFullYear())) && state.days[d].typ === 'urlaub';
+  }).length;
+  const resturlaub = state.settings.urlaubsanspruch - urlaubJahr;
+
+  const cls = v => v>0.001 ? 'pos' : (v<-0.001 ? 'neg' : 'neutral');
+
+  const openDates = dateRange(state.settings.startdatum, todayStr()).filter(needsStamping);
+  const nextOpen = openDates[0] || null;
+
+  const items = [
+    {label:'Startsaldo', value: fmtHM(startsaldoMin), sub: 'ab '+state.settings.startdatum, cls:'neutral'},
+    {label:'Aktueller Kontostand', value: fmtHM(kontostand), sub:'inkl. Startsaldo', cls: cls(kontostand)},
+    {label:'Monat Soll', value: fmtHM(monatVoll.soll), sub: MONATE[now.getMonth()]+' (ganzer Monat)', cls:'neutral'},
+    {label:'Monat Ist', value: fmtHM(monatBisHeute.ist), sub:'bis heute', cls:'neutral'},
+    {label:'Monat Saldo', value: fmtHMSigned(monatBisHeute.saldo), sub:'Ist − Soll, bis heute', cls: cls(monatBisHeute.saldo)},
+    {label:'Jahreskonto', value: fmtHMSigned(jahreskonto), sub: now.getFullYear()+'', cls: cls(jahreskonto)},
+    {label:'Überstunden', value: fmtHM(kontostand), sub:'= aktueller Kontostand inkl. Startsaldo', cls: cls(kontostand)},
+    {label:'Resturlaub', value: resturlaub+' Tage', sub: urlaubJahr+' von '+state.settings.urlaubsanspruch+' genommen', cls:'neutral'},
+    {label:'Offene Stempel-Nachträge', value: openDates.length+' Tage', sub: nextOpen ? ('nächster: '+nextOpen) : 'alles nachgetragen', cls: openDates.length>0?'neg':'pos'}
+  ];
+  grid.innerHTML = items.map(it=>`
+    <div class="card stat">
+      <div class="label">${it.label}</div>
+      <div class="value ${it.cls}">${it.value}</div>
+      <div class="sub">${it.sub}</div>
+    </div>
+  `).join('');
+
+  renderYearStats(now.getFullYear());
+}
+
+function computeYearShiftStats(year){
+  const stats = {};
+  state.shifts.forEach(s=>{ stats[s.id] = {count:0, minutes:0}; });
+  let krankenstandTage = 0;
+  let nachtdienste = 0;
+  let sonnFeiertagMinuten = 0;
+  const bereitschaftCounts = {};
+  BEREITSCHAFT_TYPES.forEach(bt=>{ bereitschaftCounts[bt.code] = 0; });
+  const yearStart = fmtDate(new Date(year,0,1));
+  const yearEnd = fmtDate(new Date(year,11,31));
+  const rangeEnd = (year===new Date().getFullYear() && yearEnd>todayStr()) ? todayStr() : yearEnd;
+  dateRange(yearStart, rangeEnd).forEach(dateStr=>{
+    const info = getDayInfo(dateStr);
+    if(info.typ==='krankenstand') krankenstandTage++;
+    const shift = state.shifts.find(s=>s.id===info.shiftId);
+    const worked = WORK_LIKE_TYPES.includes(info.typ) || info.typ==='feiertag';
+    if(worked && info.shiftId && stats[info.shiftId]){
+      stats[info.shiftId].count++;
+      stats[info.shiftId].minutes += info.ist;
+    }
+    if(worked && shift && shift.isNight) nachtdienste++;
+    if(info.dow===0 || info.holidayName){ sonnFeiertagMinuten += info.ist; }
+    info.bereitschaft.forEach(code=>{ if(bereitschaftCounts[code]!==undefined) bereitschaftCounts[code]++; });
+  });
+  return {stats, krankenstandTage, bereitschaftCounts, nachtdienste, sonnFeiertagMinuten};
+}
+
+function renderYearStats(year){
+  document.getElementById('statYearLabel').textContent = '(' + year + ', bis heute)';
+  const {stats, krankenstandTage, bereitschaftCounts, nachtdienste, sonnFeiertagMinuten} = computeYearShiftStats(year);
+
+  const body = document.getElementById('shiftStatsBody');
+  if(state.shifts.length===0){
+    body.innerHTML = '<tr><td colspan="3" class="muted">Keine Schichten angelegt.</td></tr>';
+  } else {
+    body.innerHTML = state.shifts.map(s=>{
+      const st = stats[s.id] || {count:0,minutes:0};
+      const label = s.kuerzel ? `${escapeHtml(s.name)} <span class="muted">(${escapeHtml(s.kuerzel)})</span>` : escapeHtml(s.name);
+      return `<tr><td>${label}</td><td>${st.count}</td><td>${fmtHM(st.minutes)}</td></tr>`;
+    }).join('');
+  }
+
+  // Verhältnis: Gesamtzeit UND Anzahl aller Schichten außer "SD" zu Gesamtzeit/Anzahl "SD"
+  const sdShift = state.shifts.find(s=>(s.kuerzel||'').toUpperCase()==='SD');
+  let ratioValue = '–';
+  let ratioHtml = `<div class="sub">Kein Schicht-Kürzel „SD" gefunden</div>`;
+  if(sdShift){
+    const sdMinutes = (stats[sdShift.id]||{minutes:0}).minutes;
+    const sdCount = (stats[sdShift.id]||{count:0}).count;
+    const otherMinutes = state.shifts.filter(s=>s.id!==sdShift.id)
+      .reduce((acc,s)=>acc+(stats[s.id]?stats[s.id].minutes:0), 0);
+    const otherCount = state.shifts.filter(s=>s.id!==sdShift.id)
+      .reduce((acc,s)=>acc+(stats[s.id]?stats[s.id].count:0), 0);
+    if(sdMinutes>0){
+      ratioValue = (otherMinutes/sdMinutes).toFixed(2) + ' : 1';
+    } else {
+      ratioValue = otherMinutes>0 ? '∞' : '0 : 0';
+    }
+    ratioHtml = `
+      <div class="ratio-rows">
+        <div class="ratio-row"><span>Anzahl Schichten</span><b>${otherCount} : ${sdCount}</b></div>
+        <div class="ratio-row"><span>Gesamtstunden</span><b>${fmtHM(otherMinutes)} : ${fmtHM(sdMinutes)}</b></div>
+      </div>`;
+  }
+
+  const bereitschaftValue = BEREITSCHAFT_TYPES.map(bt=>bt.code+' '+bereitschaftCounts[bt.code]).join(' · ');
+
+  const yearItems = [
+    {label:'Krankenstandstage', value: krankenstandTage+' Tage', sub: year+''},
+    {label:'Nachtdienstzulagen', value: nachtdienste+'', sub: 'Anzahl Nachtdienste, '+year},
+    {label:'Sonn-/Feiertagsstunden', value: fmtHM(sonnFeiertagMinuten), sub: 'Ist-Stunden an Sonn- und Feiertagen, '+year},
+    {label:'Verhältnis andere Schichten : SD', value: ratioValue, custom: ratioHtml, wide:true},
+    {label:'Bereitschaften', value: bereitschaftValue, sub: 'Anzahl Tage je Typ, '+year, wide:true}
+  ];
+  document.getElementById('yearStatsGrid').innerHTML = yearItems.map(it=>`
+    <div class="card stat${it.wide?' wide':''}">
+      <div class="label">${it.label}</div>
+      <div class="value neutral">${it.value}</div>
+      ${it.custom!=null ? it.custom : `<div class="sub">${it.sub}</div>`}
+    </div>
+  `).join('');
+}
+
+/* ---------- Rendering: Monatsansicht ---------- */
+function renderMonth(){
+  document.getElementById('monthTitle').textContent = MONATE[viewMonth] + ' ' + viewYear;
+  const dates = getMonthDates(viewYear, viewMonth);
+  const firstDay = dates[0];
+  const uebertrag = getBalanceUpTo(fmtDate(addDaysToDate(parseLocalDate(firstDay),-1)));
+  const bgMonat = getBeschaeftigungsgrad(firstDay);
+  document.getElementById('uebertragInfo').textContent = 'Übertrag Vormonat: ' + fmtHM(uebertrag) + (bgMonat!==100 ? '  ·  Beschäftigungsgrad: ' + bgMonat + ' %' : '');
+
+  const tbody = document.getElementById('monthBody');
+  const t = todayStr();
+  const nextOpenDate = findNextOpenDate();
+  const jumpBtn = document.getElementById('jumpNextOpenBtn');
+  if(nextOpenDate){
+    const dd = parseLocalDate(nextOpenDate);
+    jumpBtn.style.display = '';
+    jumpBtn.textContent = '→ Weiter beim Nachtragen (' + pad(dd.getDate())+'.'+pad(dd.getMonth()+1)+'.'+dd.getFullYear() + ')';
+  } else {
+    jumpBtn.style.display = 'none';
+  }
+
+  tbody.innerHTML = dates.map(dateStr=>{
+    const info = getDayInfo(dateStr);
+    const rowClasses = [];
+    if(info.isWeekend) rowClasses.push('weekend');
+    if(info.holidayName) rowClasses.push('holiday');
+    if(dateStr===t) rowClasses.push('today');
+    if(dateStr===nextOpenDate) rowClasses.push('next-open');
+
+    const shiftOptions = ['<option value="">– keine –</option>'].concat(
+      state.shifts.map(s=>`<option value="${s.id}" ${info.shiftId===s.id?'selected':''}>${escapeHtml(s.name)}</option>`)
+    ).join('');
+
+    const autoLabel = info.shiftId ? 'Arbeit' : 'Frei';
+    const isAuto = info.typ==='arbeit' || info.typ==='frei';
+    const typOptions = `<option value="" ${isAuto?'selected':''}>${autoLabel} (automatisch)</option>`
+      + ['urlaub','krankenstand'].map(k=>`<option value="${k}" ${info.typ===k?'selected':''}>${ABW_LABELS[k]}</option>`).join('');
+
+    const disabledTimes = ['urlaub','krankenstand'].includes(info.typ) ? 'disabled' : '';
+    const disabledShift = info.typ==='urlaub' ? 'disabled' : '';
+    const shift = state.shifts.find(s=>s.id===info.shiftId);
+    const planzeitLabel = info.typ==='urlaub'
+      ? URLAUB_PLANZEIT_START+'–'+URLAUB_PLANZEIT_END
+      : (((info.typ==='arbeit' || info.typ==='frei' || info.typ==='feiertag' || info.typ==='krankenstand') && shift) ? shift.start+'–'+shift.end+(shift.isNight?' 🌙':'') : '–');
+    const planzeitCellHtml = planzeitLabel==='–'
+      ? '–'
+      : `${planzeitLabel}<span class="soll-inline">${fmtHM(info.planzeitMinutes)} Std</span>`;
+
+    const typCell = info.holidayName
+      ? `<span class="tag">Feiertag</span><div class="muted" style="font-size:0.85em;">${escapeHtml(info.holidayName)}</div>
+         <select data-date="${dateStr}" class="typSelect">
+           <option value="" ${info.typ==='feiertag'?'selected':''}>Feiertag (automatisch)</option>
+           <option value="urlaub" ${info.typ==='urlaub'?'selected':''}>Urlaub</option>
+           <option value="krankenstand" ${info.typ==='krankenstand'?'selected':''}>Krankenstand</option>
+         </select>
+         <div class="holiday-soll">
+           <label for="fs-${dateStr}">Soll (Std)</label>
+           <input type="number" id="fs-${dateStr}" step="0.25" min="0" class="feiertagSollInput" data-date="${dateStr}" value="${info.sollOverride}" placeholder="0">
+         </div>`
+      : `<select data-date="${dateStr}" class="typSelect">${typOptions}</select>`;
+
+    const bereitschaftCell = `<div class="bs-cell">${BEREITSCHAFT_TYPES.map(bt=>{
+      const active = info.bereitschaft.includes(bt.code);
+      return `<button type="button" class="bs-pill ${active?'active':''}" data-date="${dateStr}" data-code="${bt.code}" title="${bt.code}: ${bt.start}–${bt.end}">${bt.code}</button>`;
+    }).join('')}</div>`;
+
+    const d = parseLocalDate(dateStr);
+    const lastIdx = info.segments.length - 1;
+    const segsHtml = info.segments.map((seg,idx)=>`
+      <div class="seg-row">
+        <input type="text" inputmode="numeric" class="segKommen time-field" data-date="${dateStr}" data-idx="${idx}" value="${seg.kommen||''}" placeholder="hh:mm" ${disabledTimes}>
+        <span class="seg-sep">–</span>
+        <input type="text" inputmode="numeric" class="segGehen time-field" data-date="${dateStr}" data-idx="${idx}" value="${seg.gehen||''}" placeholder="hh:mm" ${disabledTimes}>
+        ${info.segments.length>1 ? `<button type="button" class="seg-remove" data-date="${dateStr}" data-idx="${idx}" ${disabledTimes} title="Zeitpaar entfernen">✕</button>` : ''}
+        ${idx===lastIdx ? `<button type="button" class="seg-add" data-date="${dateStr}" ${disabledTimes} title="Weiteres Zeitpaar">+ Zeit</button>` : ''}
+      </div>
+      ${idx===0 && info.kommenCapped ? `<div class="cap-hint" title="Mehr als ${KOMMEN_CAP_MINUTES} Min. vor Schichtbeginn eingestempelt – für die Berechnung zählt erst ab ${info.kommenCappedTo} Uhr">⏱ gekappt auf ${info.kommenCappedTo}</div>` : ''}`).join('');
+    const zeitenCell = `<div class="zeiten-cell">${segsHtml}</div>`;
+
+    const kontostandLaufend = getBalanceUpTo(dateStr);
+
+    return `<tr class="${rowClasses.join(' ')}" data-date="${dateStr}">
+      <td class="daycol">${pad(d.getDate())}.${pad(d.getMonth()+1)}.<div class="wd">${WOCHENTAGE[d.getDay()]}</div></td>
+      <td>${typCell}</td>
+      <td><select data-date="${dateStr}" class="shiftSelect" ${disabledShift}>${shiftOptions}</select></td>
+      <td class="muted" style="white-space:nowrap;">${planzeitCellHtml}</td>
+      <td>${bereitschaftCell}</td>
+      <td>${zeitenCell}</td>
+      <td><input type="text" inputmode="numeric" class="zeitzugangInput time-field" data-date="${dateStr}" value="${info.zeitzugang}" placeholder="hh:mm"></td>
+      <td class="ist">${fmtHM(info.ist)}<span class="soll-inline">Soll ${fmtHM(info.soll)}</span></td>
+      <td class="saldo ${info.saldo>0?'pos':(info.saldo<0?'neg':'neutral')}">${fmtHMSigned(info.saldo)}</td>
+      <td class="saldo ${kontostandLaufend>0?'pos':(kontostandLaufend<0?'neg':'neutral')}">${fmtHM(kontostandLaufend)}</td>
+      <td class="remark"><input type="text" data-date="${dateStr}" class="bemerkungInput" value="${escapeHtml(info.bemerkung)}" placeholder="…"></td>
+    </tr>`;
+  }).join('');
+
+  const stats = getMonthStats(viewYear, viewMonth, false);
+  document.getElementById('footIst').textContent = fmtHM(stats.ist) + ' / Soll ' + fmtHM(stats.soll);
+  const footSaldoEl = document.getElementById('footSaldo');
+  footSaldoEl.textContent = fmtHMSigned(stats.saldo);
+  footSaldoEl.className = stats.saldo>0?'pos':(stats.saldo<0?'neg':'');
+  document.getElementById('footPlanzeit').textContent = fmtHM(stats.planzeit);
+  const kontostandEnde = getBalanceUpTo(dates[dates.length-1]);
+  const footKontostandEl = document.getElementById('footKontostand');
+  footKontostandEl.textContent = fmtHM(kontostandEnde);
+  footKontostandEl.className = kontostandEnde>0?'pos':(kontostandEnde<0?'neg':'');
+
+  const projected = getMonthProjectedStats(viewYear, viewMonth);
+  document.getElementById('footIstProjected').textContent = 'Ist ' + fmtHM(projected.ist) + ' / Soll ' + fmtHM(projected.soll);
+  const footSaldoProjEl = document.getElementById('footSaldoProjected');
+  footSaldoProjEl.textContent = fmtHMSigned(projected.saldo);
+  footSaldoProjEl.className = projected.saldo>0?'pos':(projected.saldo<0?'neg':'');
+
+  attachMonthRowListeners();
+}
+function escapeHtml(s){
+  return String(s).replace(/[&<>"']/g, c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+}
+
+function attachMonthRowListeners(){
+  document.querySelectorAll('.typSelect').forEach(el=>{
+    el.addEventListener('change', e=>{
+      const date = e.target.dataset.date;
+      const entry = ensureDay(date);
+      entry.typ = e.target.value ? e.target.value : (entry.shiftId ? 'arbeit' : 'frei');
+      scheduleSave(); renderMonth(); renderDashboard();
+    });
+  });
+  document.querySelectorAll('.feiertagSollInput').forEach(el=>{
+    el.addEventListener('change', e=>{
+      const date = e.target.dataset.date;
+      const raw = e.target.value.trim();
+      const entry = ensureDay(date);
+      entry.sollOverride = (raw==='' || isNaN(Number(raw))) ? null : Number(raw);
+      scheduleSave(); renderMonth(); renderDashboard();
+    });
+  });
+  document.querySelectorAll('.shiftSelect').forEach(el=>{
+    el.addEventListener('change', e=>{
+      const date = e.target.dataset.date;
+      const entry = ensureDay(date);
+      entry.shiftId = e.target.value;
+      if(WORK_LIKE_TYPES.includes(entry.typ)){
+        entry.typ = e.target.value ? 'arbeit' : 'frei';
+      }
+      scheduleSave(); renderMonth(); renderDashboard();
+    });
+  });
+  document.querySelectorAll('.bs-pill').forEach(btn=>{
+    btn.addEventListener('click', e=>{
+      const date = e.target.dataset.date, code = e.target.dataset.code;
+      const entry = ensureDay(date);
+      const idx = entry.bereitschaft.indexOf(code);
+      if(idx>=0) entry.bereitschaft.splice(idx,1); else entry.bereitschaft.push(code);
+      scheduleSave(); renderMonth();
+    });
+  });
+  document.querySelectorAll('.segKommen').forEach(el=>{
+    el.addEventListener('change', e=>{
+      const norm = normalizeTimeStr(e.target.value);
+      e.target.value = norm;
+      const date = e.target.dataset.date, idx = e.target.dataset.idx;
+      updateSegment(date, parseInt(idx,10), 'kommen', norm);
+      scheduleSave(); renderMonth(); renderDashboard();
+      const gehenEl = document.querySelector(`.segGehen[data-date="${date}"][data-idx="${idx}"]`);
+      if(gehenEl) gehenEl.focus();
+    });
+  });
+  document.querySelectorAll('.segGehen').forEach(el=>{
+    el.addEventListener('change', e=>{
+      const norm = normalizeTimeStr(e.target.value);
+      e.target.value = norm;
+      updateSegment(e.target.dataset.date, parseInt(e.target.dataset.idx,10), 'gehen', norm);
+      scheduleSave(); renderMonth(); renderDashboard();
+    });
+  });
+  document.querySelectorAll('.zeitzugangInput').forEach(el=>{
+    el.addEventListener('change', e=>{
+      const norm = normalizeTimeStr(e.target.value);
+      e.target.value = norm;
+      ensureDay(e.target.dataset.date).zeitzugang = norm;
+      scheduleSave(); renderMonth(); renderDashboard();
+    });
+  });
+  document.querySelectorAll('.seg-add').forEach(btn=>{
+    btn.addEventListener('click', e=>{
+      const entry = ensureDay(e.target.dataset.date);
+      entry.stempel.push({kommen:'', gehen:''});
+      scheduleSave(); renderMonth(); renderDashboard();
+    });
+  });
+  document.querySelectorAll('.seg-remove').forEach(btn=>{
+    btn.addEventListener('click', e=>{
+      const entry = ensureDay(e.target.dataset.date);
+      const idx = parseInt(e.target.dataset.idx,10);
+      entry.stempel.splice(idx,1);
+      if(entry.stempel.length===0) entry.stempel.push({kommen:'', gehen:''});
+      scheduleSave(); renderMonth(); renderDashboard();
+    });
+  });
+  document.querySelectorAll('.bemerkungInput').forEach(el=>{
+    el.addEventListener('change', e=>{
+      ensureDay(e.target.dataset.date).bemerkung = e.target.value;
+      scheduleSave();
+    });
+  });
+}
+function ensureDay(dateStr){
+  let entry = state.days[dateStr];
+  if(!entry){
+    entry = {typ:'frei', shiftId:'', stempel:[{kommen:'', gehen:''}], bereitschaft:[], zeitzugang:'', bemerkung:''};
+    state.days[dateStr] = entry;
+  } else if(!entry.stempel || !entry.stempel.length){
+    const seg = (entry.kommen || entry.gehen) ? [{kommen:entry.kommen||'', gehen:entry.gehen||''}] : [{kommen:'', gehen:''}];
+    entry.stempel = seg;
+    delete entry.kommen; delete entry.gehen;
+  }
+  if(!entry.bereitschaft) entry.bereitschaft = [];
+  return entry;
+}
+function updateSegment(dateStr, idx, field, value){
+  const entry = ensureDay(dateStr);
+  if(!entry.stempel[idx]) entry.stempel[idx] = {kommen:'', gehen:''};
+  entry.stempel[idx][field] = value;
+}
+
+/* ---------- Rendering: Schichten ---------- */
+function renderShifts(){
+  const list = document.getElementById('shiftList');
+  if(state.shifts.length===0){
+    list.innerHTML = '<p class="muted">Noch keine Schichten angelegt.</p>';
+    return;
+  }
+  list.innerHTML = state.shifts.map((s,idx)=>`
+    <div class="shift-row" data-id="${s.id}">
+      <div class="order-btns">
+        <button class="btn ghost small moveUpBtn" ${idx===0?'disabled':''} title="Nach oben">▲</button>
+        <button class="btn ghost small moveDownBtn" ${idx===state.shifts.length-1?'disabled':''} title="Nach unten">▼</button>
+      </div>
+      <div class="name">${escapeHtml(s.name)}${s.kuerzel?` <span class="muted">(${escapeHtml(s.kuerzel)})</span>`:''}</div>
+      <div class="time">${s.start} – ${s.end}</div>
+      ${s.isNight?'<span class="night-badge">🌙 über Mitternacht</span>':''}
+      <div class="spacer"></div>
+      <button class="btn ghost small editShiftBtn">Bearbeiten</button>
+      <button class="btn danger small deleteShiftBtn">Löschen</button>
+    </div>
+  `).join('');
+
+  list.querySelectorAll('.deleteShiftBtn').forEach(btn=>{
+    btn.addEventListener('click', e=>{
+      const id = e.target.closest('.shift-row').dataset.id;
+      if(confirm('Diese Schicht wirklich löschen?')){
+        state.shifts = state.shifts.filter(s=>s.id!==id);
+        scheduleSave(); renderShifts(); renderMonth();
+      }
+    });
+  });
+  list.querySelectorAll('.editShiftBtn').forEach(btn=>{
+    btn.addEventListener('click', e=>{
+      const row = e.target.closest('.shift-row');
+      const id = row.dataset.id;
+      const s = state.shifts.find(x=>x.id===id);
+      const name = prompt('Name der Schicht:', s.name);
+      if(name===null) return;
+      const kuerzel = prompt('Kürzel (optional, z. B. FD/TD/SD/ND):', s.kuerzel||'');
+      if(kuerzel===null) return;
+      const startRaw = prompt('Beginn (z. B. 06:00 oder einfach 0600):', s.start);
+      if(startRaw===null) return;
+      const endRaw = prompt('Ende (z. B. 14:00 oder einfach 1400):', s.end);
+      if(endRaw===null) return;
+      const start = normalizeTimeStr(startRaw), end = normalizeTimeStr(endRaw);
+      if(!start || !end){ showToast('Ungültige Zeit – Schicht wurde nicht geändert'); return; }
+      s.name = name; s.kuerzel = kuerzel.trim(); s.start = start; s.end = end;
+      s.isNight = isOvernightShift(start, end);
+      scheduleSave(); renderShifts(); renderMonth();
+    });
+  });
+  list.querySelectorAll('.moveUpBtn').forEach(btn=>{
+    btn.addEventListener('click', e=>{
+      const id = e.target.closest('.shift-row').dataset.id;
+      const i = state.shifts.findIndex(s=>s.id===id);
+      if(i>0){ [state.shifts[i-1],state.shifts[i]] = [state.shifts[i],state.shifts[i-1]]; scheduleSave(); renderShifts(); }
+    });
+  });
+  list.querySelectorAll('.moveDownBtn').forEach(btn=>{
+    btn.addEventListener('click', e=>{
+      const id = e.target.closest('.shift-row').dataset.id;
+      const i = state.shifts.findIndex(s=>s.id===id);
+      if(i<state.shifts.length-1){ [state.shifts[i+1],state.shifts[i]] = [state.shifts[i],state.shifts[i+1]]; scheduleSave(); renderShifts(); }
+    });
+  });
+}
+function timeToNum(t){ const [h,m]=t.split(':').map(Number); return h*60+m; }
+/* Eine Schicht gilt als "über Mitternacht", wenn das Ende vor dem Beginn liegt
+   oder genau 00:00 Uhr ist (z. B. 16:00–00:00) - beides bedeutet, dass das
+   Ende am Folgetag liegt. */
+function isOvernightShift(start, end){
+  return timeToNum(end) <= timeToNum(start);
+}
+
+/* ---------- Rendering: Abwesenheiten ---------- */
+function renderAbwesenheiten(){
+  const now = new Date();
+  const yearPrefix = String(now.getFullYear());
+  const counts = {urlaub:0, krankenstand:0, feiertag:0};
+  Object.keys(state.days).forEach(d=>{
+    if(!d.startsWith(yearPrefix)) return;
+    const info = getDayInfo(d);
+    if(counts[info.typ]!==undefined) counts[info.typ]++;
+  });
+  // Feiertage die auf Werktage fallen im laufenden Jahr zählen
+  const holidays = getHolidaysForYear(now.getFullYear());
+  counts.feiertag = Object.keys(holidays).filter(d=>{
+    const dow = parseLocalDate(d).getDay();
+    return dow!==0 && dow!==6;
+  }).length;
+
+  const resturlaub = state.settings.urlaubsanspruch - counts.urlaub;
+  const summary = document.getElementById('abwSummary');
+  summary.innerHTML = `
+    <div class="card stat"><div class="label">Urlaub genommen</div><div class="value neutral">${counts.urlaub} Tg</div><div class="sub">Resturlaub: ${resturlaub} Tg</div></div>
+    <div class="card stat"><div class="label">Krankenstand</div><div class="value neutral">${counts.krankenstand} Tg</div></div>
+    <div class="card stat"><div class="label">Feiertage (Werktage)</div><div class="value neutral">${counts.feiertag} Tg</div><div class="sub">${now.getFullYear()}</div></div>
+  `;
+
+  const holidayList = document.getElementById('holidayList');
+  const entries = Object.entries(holidays).sort((a,b)=>a[0]<b[0]?-1:1);
+  holidayList.innerHTML = entries.map(([d,name])=>{
+    const dt = parseLocalDate(d);
+    return `<div>${pad(dt.getDate())}.${pad(dt.getMonth()+1)}.${dt.getFullYear()} — ${escapeHtml(name)} <span class="muted">(${WOCHENTAGE[dt.getDay()]})</span></div>`;
+  }).join('');
+
+  const dpSchicht = document.getElementById('dpSchicht');
+  const prevVal = dpSchicht.value;
+  dpSchicht.innerHTML = '<option value="">– keine (nur Bereitschaft) –</option>' +
+    state.shifts.map(s=>`<option value="${s.id}">${escapeHtml(s.name)}${s.kuerzel?' ('+escapeHtml(s.kuerzel)+')':''}</option>`).join('');
+  if(state.shifts.some(s=>s.id===prevVal)) dpSchicht.value = prevVal;
+
+  const dpBereitschaft = document.getElementById('dpBereitschaft');
+  dpBereitschaft.innerHTML = BEREITSCHAFT_TYPES.map(bt=>`
+    <label style="display:inline-flex; align-items:center; gap:6px; font-size:13px; color:var(--text-dim); font-weight:500;">
+      <input type="checkbox" class="dpBtCheck" value="${bt.code}" style="width:auto;"> ${bt.code}
+    </label>
+  `).join('');
+}
+
+/* ---------- Einstellungen ---------- */
+function renderSettingsForm(){
+  document.getElementById('setStartsaldo').value = state.settings.startsaldo;
+  document.getElementById('setStartdatum').value = state.settings.startdatum;
+  document.getElementById('setSollstunden').value = state.settings.sollstundenTag;
+  document.getElementById('setUrlaubsanspruch').value = state.settings.urlaubsanspruch;
+  renderBeschaeftigungsgrad();
+}
+function renderBeschaeftigungsgrad(){
+  const list = document.getElementById('bgList');
+  const entries = Object.entries(state.beschaeftigungsgrad||{}).sort((a,b)=>b[0]<a[0]?-1:1);
+  if(entries.length===0){
+    list.innerHTML = '<p class="muted">Keine Abweichungen eingetragen – überall 100 %.</p>';
+    return;
+  }
+  list.innerHTML = entries.map(([monat, prozent])=>{
+    const [y,m] = monat.split('-');
+    return `
+    <div class="shift-row" data-monat="${monat}">
+      <div class="name">${MONATE[Number(m)-1]} ${y}</div>
+      <div class="time">${prozent} %</div>
+      <div class="spacer"></div>
+      <button class="btn danger small bgDeleteBtn">Löschen</button>
+    </div>`;
+  }).join('');
+  list.querySelectorAll('.bgDeleteBtn').forEach(btn=>{
+    btn.addEventListener('click', e=>{
+      const monat = e.target.closest('.shift-row').dataset.monat;
+      delete state.beschaeftigungsgrad[monat];
+      scheduleSave(); renderBeschaeftigungsgrad(); renderMonth(); renderDashboard();
+    });
+  });
+}
+
+/* ---------- Tab-Navigation ---------- */
+function switchTab(tab){
+  document.querySelectorAll('#tabNav button').forEach(b=>b.classList.toggle('active', b.dataset.tab===tab));
+  document.querySelectorAll('.view').forEach(v=>v.classList.toggle('active', v.id==='view-'+tab));
+  if(tab==='dashboard') renderDashboard();
+  if(tab==='monat') renderMonth();
+  if(tab==='schichten') renderShifts();
+  if(tab==='abwesenheiten') renderAbwesenheiten();
+  if(tab==='einstellungen') renderSettingsForm();
+}
+
+/* ---------- Export / Import ---------- */
+function downloadFile(filename, content, mime){
+  const blob = new Blob([content], {type:mime});
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url; a.download = filename;
+  document.body.appendChild(a); a.click(); document.body.removeChild(a);
+  URL.revokeObjectURL(url);
+}
+function exportJson(){
+  downloadFile('zeiterfassung-backup-'+todayStr()+'.json', JSON.stringify(state, null, 2), 'application/json');
+  showToast('JSON-Export gestartet');
+}
+function importJson(file){
+  const reader = new FileReader();
+  reader.onload = e=>{
+    try{
+      const parsed = JSON.parse(e.target.result);
+      if(!parsed.settings || !parsed.days){ throw new Error('Ungültiges Format'); }
+      if(!confirm('Import überschreibt alle aktuellen Daten. Fortfahren?')) return;
+      state = parsed;
+      scheduleSave();
+      renderSettingsForm(); renderShifts(); renderMonth(); renderDashboard(); renderAbwesenheiten();
+      showToast('Import erfolgreich');
+    }catch(err){
+      showToast('Import fehlgeschlagen: ungültige Datei');
+    }
+  };
+  reader.readAsText(file);
+}
+function exportCsv(){
+  const dates = getMonthDates(viewYear, viewMonth);
+  const rows = [['Datum','Wochentag','Typ','Schicht','Planzeit','Bereitschaft','Zeiten','Zeitzugang','Ist','Saldo','Kontostand','Bemerkung']];
+  dates.forEach(dateStr=>{
+    const info = getDayInfo(dateStr);
+    const d = parseLocalDate(dateStr);
+    const shift = state.shifts.find(s=>s.id===info.shiftId);
+    const planzeit = info.typ==='urlaub'
+      ? URLAUB_PLANZEIT_START+'-'+URLAUB_PLANZEIT_END
+      : (((WORK_LIKE_TYPES.includes(info.typ) || info.typ==='feiertag' || info.typ==='krankenstand') && shift) ? shift.start+'-'+shift.end : '');
+    const zeiten = info.segments.filter(s=>s.kommen||s.gehen).map(s=>(s.kommen||'?')+'-'+(s.gehen||'?')).join(' / ');
+    rows.push([
+      dateStr, WOCHENTAGE[d.getDay()], ABW_LABELS[info.typ]||info.typ, shift?shift.name:'',
+      planzeit, info.bereitschaft.join('+'), zeiten, info.zeitzugang, fmtHM(info.ist), fmtHMSigned(info.saldo), fmtHM(getBalanceUpTo(dateStr)), info.bemerkung
+    ]);
+  });
+  const csv = rows.map(r=>r.map(v=>'"'+String(v).replace(/"/g,'""')+'"').join(';')).join('\n');
+  downloadFile('zeiterfassung-'+viewYear+'-'+pad(viewMonth+1)+'.csv', csv, 'text/csv;charset=utf-8');
+  showToast('CSV-Export gestartet');
+}
+
+/* ---------- iCal-Export ---------- */
+function icsEscape(str){
+  return String(str).replace(/([,;])/g,'\\$1').replace(/\r?\n/g,'\\n');
+}
+function icsDateTime(dateStr, timeStr){
+  return dateStr.replace(/-/g,'') + 'T' + timeStr.replace(':','') + '00';
+}
+function icsTimestampNow(){
+  const n = new Date();
+  return n.getUTCFullYear() + pad(n.getUTCMonth()+1) + pad(n.getUTCDate()) + 'T' +
+    pad(n.getUTCHours()) + pad(n.getUTCMinutes()) + pad(n.getUTCSeconds()) + 'Z';
+}
+function exportIcal(){
+  const monthVal = document.getElementById('icalMonth').value;
+  if(!monthVal){ showToast('Bitte einen Monat auswählen'); return; }
+  const [y,m] = monthVal.split('-').map(Number);
+  const year = y, monthIdx = m-1;
+  const dates = getMonthDates(year, monthIdx);
+  const dtstamp = icsTimestampNow();
+  const lines = ['BEGIN:VCALENDAR','VERSION:2.0','PRODID:-//Zeiterfassung//DE','CALSCALE:GREGORIAN'];
+  let count = 0;
+  dates.forEach(dateStr=>{
+    const info = getDayInfo(dateStr);
+    const shift = state.shifts.find(s=>s.id===info.shiftId);
+    if(!shift) return;
+    if(!(info.typ==='arbeit' || info.typ==='frei' || info.typ==='feiertag')) return;
+    const endDateStr = shift.isNight ? fmtDate(addDaysToDate(parseLocalDate(dateStr),1)) : dateStr;
+    lines.push('BEGIN:VEVENT');
+    lines.push('UID:'+dateStr+'-'+shift.id+'@zeiterfassung');
+    lines.push('DTSTAMP:'+dtstamp);
+    lines.push('DTSTART:'+icsDateTime(dateStr, shift.start));
+    lines.push('DTEND:'+icsDateTime(endDateStr, shift.end));
+    lines.push('SUMMARY:L '+icsEscape(shift.name));
+    lines.push('COLOR:yellow');
+    lines.push('END:VEVENT');
+    count++;
+  });
+  lines.push('END:VCALENDAR');
+  if(count===0){ showToast('Keine Schichten in diesem Monat gefunden'); return; }
+  downloadFile('schichten-'+year+'-'+pad(monthIdx+1)+'.ics', lines.join('\r\n'), 'text/calendar;charset=utf-8');
+  showToast(count+' Termin(e) exportiert');
+}
+
+async function clearAll(){
+  if(!confirm('Wirklich ALLE Daten unwiderruflich löschen? Dies kann nicht rückgängig gemacht werden.')) return;
+  if(!confirm('Letzte Bestätigung: Alle Einstellungen, Schichten und Tage werden gelöscht.')) return;
+  state = JSON.parse(JSON.stringify(DEFAULT_STATE));
+  state.shifts = defaultShifts();
+  await saveState();
+  renderSettingsForm(); renderShifts(); renderMonth(); renderDashboard(); renderAbwesenheiten();
+  showToast('Alle Daten wurden gelöscht');
+}
+
+/* ---------- Event-Bindings ---------- */
+function bindEvents(){
+  document.querySelectorAll('#tabNav button').forEach(btn=>{
+    btn.addEventListener('click', ()=>switchTab(btn.dataset.tab));
+  });
+
+  document.getElementById('prevMonth').addEventListener('click', ()=>{
+    viewMonth--; if(viewMonth<0){viewMonth=11; viewYear--;}
+    renderMonth();
+  });
+  document.getElementById('nextMonth').addEventListener('click', ()=>{
+    viewMonth++; if(viewMonth>11){viewMonth=0; viewYear++;}
+    renderMonth();
+  });
+  document.getElementById('todayMonth').addEventListener('click', ()=>{
+    const n = new Date(); viewYear=n.getFullYear(); viewMonth=n.getMonth();
+    renderMonth();
+  });
+  document.getElementById('jumpNextOpenBtn').addEventListener('click', ()=>{
+    const openDate = findNextOpenDate();
+    if(!openDate) return;
+    const d = parseLocalDate(openDate);
+    viewYear = d.getFullYear(); viewMonth = d.getMonth();
+    renderMonth();
+    const row = document.querySelector(`tr[data-date="${openDate}"]`);
+    if(row) row.scrollIntoView({block:'center', behavior:'smooth'});
+  });
+
+  document.getElementById('addShiftBtn').addEventListener('click', ()=>{
+    const name = document.getElementById('shiftName').value.trim();
+    const kuerzel = document.getElementById('shiftKuerzel').value.trim();
+    const start = normalizeTimeStr(document.getElementById('shiftStart').value);
+    const end = normalizeTimeStr(document.getElementById('shiftEnd').value);
+    if(!name || !start || !end){ showToast('Bitte Name sowie gültige Zeiten (hh:mm) angeben'); return; }
+    state.shifts.push({id:uid(), name, kuerzel, start, end, isNight: isOvernightShift(start,end)});
+    document.getElementById('shiftName').value='';
+    document.getElementById('shiftKuerzel').value='';
+    scheduleSave(); renderShifts(); renderMonth();
+    showToast('Schicht hinzugefügt');
+  });
+  document.getElementById('loadDefaultShifts').addEventListener('click', ()=>{
+    defaultShifts().forEach(s=>{
+      if(!state.shifts.find(x=>x.name===s.name)) state.shifts.push(Object.assign({},s,{id:uid()}));
+    });
+    scheduleSave(); renderShifts();
+    showToast('Standard-Schichten geladen');
+  });
+
+  document.getElementById('dpApplyBtn').addEventListener('click', ()=>{
+    const von = document.getElementById('dpVon').value;
+    const bis = document.getElementById('dpBis').value;
+    const shiftId = document.getElementById('dpSchicht').value;
+    const nurWerktage = document.getElementById('dpNurWerktage').checked;
+    const bereitschaftCodes = Array.from(document.querySelectorAll('.dpBtCheck:checked')).map(el=>el.value);
+    if(!von || !bis){ showToast('Bitte Von- und Bis-Datum wählen'); return; }
+    if(von>bis){ showToast('„Von“ muss vor „Bis“ liegen'); return; }
+    if(!shiftId && bereitschaftCodes.length===0){ showToast('Bitte Schicht und/oder Bereitschaft wählen'); return; }
+    let count=0;
+    dateRange(von,bis).forEach(dateStr=>{
+      const dow = parseLocalDate(dateStr).getDay();
+      const isWeekend = dow===0||dow===6;
+      if(nurWerktage && isWeekend) return;
+      const entry = ensureDay(dateStr);
+      if(shiftId){ entry.shiftId = shiftId; entry.typ = 'arbeit'; }
+      if(bereitschaftCodes.length) entry.bereitschaft = bereitschaftCodes.slice();
+      count++;
+    });
+    scheduleSave(); renderMonth(); renderDashboard(); renderAbwesenheiten();
+    document.getElementById('dpHint').textContent = count + ' Tag(e) aktualisiert.';
+    showToast(count + ' Tag(e) aktualisiert');
+  });
+
+  document.getElementById('abwApplyBtn').addEventListener('click', ()=>{
+    const von = document.getElementById('abwVon').value;
+    const bis = document.getElementById('abwBis').value;
+    const typ = document.getElementById('abwTyp').value;
+    const nurWerktage = document.getElementById('abwNurWerktage').checked;
+    if(!von || !bis){ showToast('Bitte Von- und Bis-Datum wählen'); return; }
+    if(von>bis){ showToast('„Von“ muss vor „Bis“ liegen'); return; }
+    let count=0;
+    dateRange(von,bis).forEach(dateStr=>{
+      const dow = parseLocalDate(dateStr).getDay();
+      const isWeekend = dow===0||dow===6;
+      if(getHoliday(dateStr)) return;
+      if(nurWerktage && isWeekend) return;
+      const entry = ensureDay(dateStr);
+      entry.typ = typ ? typ : (entry.shiftId ? 'arbeit' : 'frei');
+      count++;
+    });
+    scheduleSave(); renderMonth(); renderDashboard(); renderAbwesenheiten();
+    document.getElementById('abwHint').textContent = count + ' Tag(e) aktualisiert.';
+  });
+
+  document.getElementById('saveSettingsBtn').addEventListener('click', ()=>{
+    state.settings.startsaldo = parseFloat(document.getElementById('setStartsaldo').value) || 0;
+    state.settings.startdatum = document.getElementById('setStartdatum').value || todayStr();
+    state.settings.sollstundenTag = parseFloat(document.getElementById('setSollstunden').value) || 8;
+    state.settings.urlaubsanspruch = parseInt(document.getElementById('setUrlaubsanspruch').value) || 0;
+    scheduleSave(); renderDashboard(); renderMonth(); renderAbwesenheiten();
+    showToast('Einstellungen gespeichert');
+  });
+
+  document.getElementById('bgAddBtn').addEventListener('click', ()=>{
+    const monatRaw = document.getElementById('bgMonat').value;
+    const monat = normalizeMonatStr(monatRaw);
+    const prozent = parseFloat(document.getElementById('bgProzent').value);
+    if(!monat){ showToast('Bitte einen gültigen Monat angeben (Format JJJJ-MM, z. B. 2026-08)'); return; }
+    if(isNaN(prozent) || prozent<=0 || prozent>100){ showToast('Bitte einen Beschäftigungsgrad zwischen 1 und 100 % angeben'); return; }
+    if(!state.beschaeftigungsgrad) state.beschaeftigungsgrad = {};
+    if(prozent===100){ delete state.beschaeftigungsgrad[monat]; }
+    else{ state.beschaeftigungsgrad[monat] = prozent; }
+    scheduleSave(); renderBeschaeftigungsgrad(); renderMonth(); renderDashboard();
+    showToast('Beschäftigungsgrad gespeichert');
+  });
+
+  document.getElementById('exportJsonBtn').addEventListener('click', exportJson);
+  document.getElementById('importJsonInput').addEventListener('change', e=>{
+    if(e.target.files[0]) importJson(e.target.files[0]);
+    e.target.value = '';
+  });
+  document.getElementById('exportCsvBtn').addEventListener('click', exportCsv);
+  document.getElementById('exportIcalBtn').addEventListener('click', exportIcal);
+  document.getElementById('clearAllBtn').addEventListener('click', clearAll);
+
+  document.getElementById('darkToggle').addEventListener('change', e=>{
+    state.settings.darkMode = e.target.checked;
+    applyDarkMode();
+    scheduleSave();
+  });
+
+  document.getElementById('logoutBtn').addEventListener('click', async ()=>{
+    if(sb) await sb.auth.signOut();
+    window.location.reload();
+  });
+}
+function applyDarkMode(){
+  document.documentElement.classList.toggle('dark', !!state.settings.darkMode);
+  document.getElementById('darkToggle').checked = !!state.settings.darkMode;
+}
+
+/* ---------- Auth ---------- */
+let authMode = 'login'; // 'login' | 'register'
+let appStarted = false;
+
+function setAuthMode(mode){
+  authMode = mode;
+  document.getElementById('authTitle').textContent = mode==='login' ? 'Anmelden' : 'Konto erstellen';
+  document.getElementById('authSubmitBtn').textContent = mode==='login' ? 'Anmelden' : 'Registrieren';
+  document.getElementById('authSwitchMode').innerHTML = mode==='login'
+    ? 'Noch kein Konto? <a id="authSwitchLink">Registrieren</a>'
+    : 'Bereits ein Konto? <a id="authSwitchLink">Anmelden</a>';
+  document.getElementById('authError').textContent = '';
+  document.getElementById('authSwitchLink').addEventListener('click', ()=> setAuthMode(mode==='login' ? 'register' : 'login'));
+}
+function bindAuthEvents(){
+  setAuthMode('login');
+  document.getElementById('authSubmitBtn').addEventListener('click', async ()=>{
+    const email = document.getElementById('authEmail').value.trim();
+    const password = document.getElementById('authPassword').value;
+    const errorEl = document.getElementById('authError');
+    errorEl.textContent = '';
+    if(!email || !password){ errorEl.textContent = 'Bitte E-Mail und Passwort eingeben.'; return; }
+    try{
+      if(authMode==='login'){
+        const {error} = await sb.auth.signInWithPassword({email, password});
+        if(error) throw error;
+      }else{
+        const {error} = await sb.auth.signUp({email, password});
+        if(error) throw error;
+        errorEl.style.color = 'var(--green)';
+        errorEl.textContent = 'Konto erstellt. Falls Bestätigung per E-Mail aktiviert ist, prüfe dein Postfach und melde dich danach an.';
+        errorEl.style.color = '';
+      }
+    }catch(e){
+      errorEl.textContent = e.message || 'Anmeldung fehlgeschlagen.';
+    }
+  });
+}
+function showAuthOverlay(){
+  document.getElementById('authOverlay').classList.remove('hidden');
+  document.getElementById('app-root').classList.add('hidden');
+}
+function hideAuthOverlay(){
+  document.getElementById('authOverlay').classList.add('hidden');
+  document.getElementById('app-root').classList.remove('hidden');
+  document.getElementById('userEmailLabel').textContent = currentUser ? currentUser.email : '';
+}
+
+/* ---------- Init ---------- */
+async function startApp(){
+  if(appStarted) return;
+  appStarted = true;
+  hideAuthOverlay();
+  await loadState();
+  const now = new Date();
+  viewYear = now.getFullYear(); viewMonth = now.getMonth();
+  applyDarkMode();
+  bindEvents();
+  renderDashboard();
+  renderMonth();
+  renderShifts();
+  renderAbwesenheiten();
+  renderSettingsForm();
+  document.getElementById('icalMonth').value = now.getFullYear()+'-'+pad(now.getMonth()+1);
+}
+async function init(){
+  if(!sb){
+    // Kein Supabase konfiguriert (z. B. lokale Entwicklung ohne Zugangsdaten) -
+    // App startet direkt mit lokalem Speicher, kein Login nötig.
+    await startApp();
+    return;
+  }
+  bindAuthEvents();
+  sb.auth.onAuthStateChange((event, session)=>{
+    currentUser = session ? session.user : null;
+    if(currentUser){ startApp(); }
+    else if(appStarted){ window.location.reload(); }
+    else { showAuthOverlay(); }
+  });
+  const {data:{session}} = await sb.auth.getSession();
+  currentUser = session ? session.user : null;
+  if(currentUser){ await startApp(); }
+  else{ showAuthOverlay(); }
+}
+init();
+
+})();
+</script>
+</body>
+</html>
