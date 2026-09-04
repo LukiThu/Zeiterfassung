@@ -308,7 +308,7 @@
         </tfoot>
       </table>
     </div>
-    <p class="muted" style="margin-top:8px;">„Kontostand" zeigt die laufende Berechnung deiner Stunden zu diesem Zeitpunkt – also den Saldo inklusive Startsaldo, aufsummiert bis einschließlich des jeweiligen Tages. Stempelst du beim ersten Zeitpaar des Tages mehr als 10 Minuten vor Beginn der ausgewählten Schicht ein, zählt für die Berechnung nur die Zeit ab „Schichtbeginn − 10 Minuten“ – ein kleiner Hinweis zeigt dir dann die gekappte Zeit an (bei der Schicht mit Kürzel „SD“ entfällt diese Kappung, dort zählt immer die tatsächliche Stempelzeit). Die Monatssumme unten enthält zusätzlich die gesamte geplante Schichtzeit (Planzeit) des Monats. Bei „Bereitschaft“ kannst du pro Tag mehrere Bereitschaftstypen gleichzeitig markieren – das fließt nicht in Soll/Ist/Saldo ein, sondern ist reine Zusatzinfo. An Feiertagen kannst du ganz normal Schicht und Zeiten eintragen; die Sollzeit bleibt dabei 0, außer du trägst im Feld „Soll (Std)“ bei diesem Tag bewusst einen eigenen Wert ein. Der Typ steht standardmäßig auf „Arbeit/Frei (automatisch)“ – sobald du eine Schicht auswählst, wird automatisch „Arbeit“ daraus, ohne Schicht bleibt es „Frei“. Nur für Urlaub oder Krankenstand wählst du den Typ bewusst manuell aus; bei Krankenstand kannst du zusätzlich eine Schicht angeben, dann wird die Ist-Zeit automatisch auf deren Dauer gesetzt (Soll bleibt normal). „Zeitzugang" addiert einen frei eingegebenen Stundenwert (hh:mm) zur Ist-Zeit des Tages, egal welcher Typ eingetragen ist.</p>
+    <p class="muted" style="margin-top:8px;">„Kontostand" zeigt die laufende Berechnung deiner Stunden zu diesem Zeitpunkt – also den Saldo inklusive Startsaldo, aufsummiert bis einschließlich des jeweiligen Tages. Stempelst du beim ersten Zeitpaar des Tages mehr als 10 Minuten vor Beginn der ausgewählten Schicht ein, zählt für die Berechnung nur die Zeit ab „Schichtbeginn − 10 Minuten“ – ein kleiner Hinweis zeigt dir dann die gekappte Zeit an (bei der Schicht mit Kürzel „SD“ entfällt diese Kappung, dort zählt immer die tatsächliche Stempelzeit). Die Monatssumme unten enthält zusätzlich die gesamte geplante Schichtzeit (Planzeit) des Monats. Bei „Bereitschaft“ kannst du pro Tag mehrere Bereitschaftstypen gleichzeitig markieren – das fließt nicht in Soll/Ist/Saldo ein, sondern ist reine Zusatzinfo. An Feiertagen kannst du ganz normal Schicht und Zeiten eintragen; die Sollzeit bleibt dabei 0, außer du trägst im Feld „Soll (Std)“ bei diesem Tag bewusst einen eigenen Wert ein. Tage, die nicht in der gesetzlichen Liste stehen, aber bei dir wie ein Feiertag zählen (z. B. der 24.12. als halber Feiertag), legst du unter „Einstellungen → Eigene Feiertage“ mit eigener Sollstundenzahl an – der graue Platzhalter im Feld „Soll (Std)“ zeigt dir dann, welcher Wert für diesen Tag hinterlegt ist. Der Typ steht standardmäßig auf „Arbeit/Frei (automatisch)“ – sobald du eine Schicht auswählst, wird automatisch „Arbeit“ daraus, ohne Schicht bleibt es „Frei“. Nur für Urlaub oder Krankenstand wählst du den Typ bewusst manuell aus; bei Krankenstand kannst du zusätzlich eine Schicht angeben, dann wird die Ist-Zeit automatisch auf deren Dauer gesetzt (Soll bleibt normal). „Zeitzugang" addiert einen frei eingegebenen Stundenwert (hh:mm) zur Ist-Zeit des Tages, egal welcher Typ eingetragen ist.</p>
   </section>
 
   <!-- SCHICHTEN -->
@@ -381,7 +381,8 @@
       <p class="muted" id="abwHint" style="margin-top:8px;"></p>
     </div>
     <div class="card" style="margin-top:16px;">
-      <h2>Erkannte Feiertage im aktuellen Jahr</h2>
+      <h2>Feiertage im aktuellen Jahr</h2>
+      <p class="muted" style="margin-bottom:8px;">Gesetzliche Feiertage plus deine eigenen Einträge (anzulegen unter „Einstellungen“).</p>
       <div id="holidayList" class="muted"></div>
     </div>
   </section>
@@ -410,6 +411,25 @@
         <div class="field" style="display:flex; align-items:flex-end;"><button class="btn" id="bgAddBtn">Speichern</button></div>
       </div>
       <div class="shift-list" id="bgList" style="margin-top:14px;"></div>
+    </div>
+
+    <hr class="sep">
+
+    <div class="card">
+      <h2>Eigene Feiertage</h2>
+      <p class="muted">Zusätzlich zur gesetzlichen Liste – für Tage, die bei dir wie ein Feiertag zählen, aber nicht offiziell einer sind. „Sollstunden“ ist die Sollzeit an diesem Tag bei 100 % Beschäftigungsgrad: <strong>0</strong> = ganzer Feiertag, <strong>4</strong> = halber Feiertag (z. B. 24.12. bei 8 Std Normalsoll). Fällt der Tag auf ein Wochenende, bleibt die Sollzeit 0. Der Wert im Feld „Soll (Std)“ beim einzelnen Tag in der Monatsansicht hat weiterhin Vorrang.</p>
+      <div class="form-grid">
+        <div class="field"><label>Datum</label><input type="date" id="chDatum"></div>
+        <div class="field"><label>Bezeichnung</label><input type="text" id="chName" placeholder="z. B. Heiliger Abend"></div>
+        <div class="field"><label>Sollstunden</label><input type="number" step="0.25" min="0" id="chSoll" value="0"></div>
+        <div class="field" style="display:flex; align-items:flex-end;">
+          <label style="display:flex; align-items:center; gap:6px; font-size:13px; color:var(--text-dim); font-weight:500;">
+            <input type="checkbox" id="chJaehrlich" checked style="width:auto;"> jedes Jahr
+          </label>
+        </div>
+        <div class="field" style="display:flex; align-items:flex-end;"><button class="btn" id="chAddBtn">Speichern</button></div>
+      </div>
+      <div class="shift-list" id="chList" style="margin-top:14px;"></div>
     </div>
 
     <hr class="sep">
@@ -488,6 +508,9 @@ const BEREITSCHAFT_TYPES = [
 /* Bei Urlaub gibt es keine echte Schicht, die Planzeit wird zur einheitlichen
    Anzeige (analog zu den anderen Tagen) auf einen festen Rahmen gesetzt. */
 const URLAUB_PLANZEIT_START = '08:00', URLAUB_PLANZEIT_END = '16:00';
+/* Zeitrahmen fuer iCal-Termine an Tagen mit Bereitschaft, aber ohne Dienst -
+   dort gibt es keine Schichtzeit, aus der sich der Termin ableiten liesse. */
+const ICAL_BEREITSCHAFT_START = '08:00', ICAL_BEREITSCHAFT_END = '19:00';
 
 const DEFAULT_STATE = {
   settings:{
@@ -502,7 +525,12 @@ const DEFAULT_STATE = {
   /* Beschäftigungsgrad pro Monat in Prozent, Schlüssel "YYYY-MM". Fehlt ein
      Monat, gilt automatisch 100 % (Vollzeit). Skaliert die Sollzeit pro
      Werktag in diesem Monat (z. B. 50 % bei sollstundenTag=8 -> 4 Std Soll/Tag). */
-  beschaeftigungsgrad:{}
+  beschaeftigungsgrad:{},
+  /* Selbst angelegte Feiertage zusätzlich zur gesetzlichen Liste (z. B. der
+     24.12. als halber Feiertag). Ein Eintrag:
+     {id, name, tag (1-31), monat (1-12), jahr (null = gilt in jedem Jahr),
+      sollStunden (Sollzeit an diesem Tag bei 100 % Beschäftigungsgrad)} */
+  customHolidays:[]
 };
 
 let state = JSON.parse(JSON.stringify(DEFAULT_STATE));
@@ -593,7 +621,7 @@ function getEasterSunday(year){
   return new Date(year, month-1, day);
 }
 const holidayCache = {};
-function getHolidaysForYear(year){
+function getOfficialHolidaysForYear(year){
   if(holidayCache[year]) return holidayCache[year];
   const easter = getEasterSunday(year);
   const map = {};
@@ -606,9 +634,40 @@ function getHolidaysForYear(year){
   holidayCache[year] = map;
   return map;
 }
-function getHoliday(dateStr){
+/* Selbst angelegte Feiertage eines Jahres als {dateStr: eintrag}. Einträge
+   ohne Jahr (jahr=null) gelten in jedem Jahr. */
+function getCustomHolidaysForYear(year){
+  const map = {};
+  (state.customHolidays||[]).forEach(ch=>{
+    if(ch.jahr!=null && Number(ch.jahr)!==year) return;
+    const m = Number(ch.monat), t = Number(ch.tag);
+    if(!m || !t) return;
+    const d = new Date(year, m-1, t);
+    if(d.getMonth()!==m-1) return; // z. B. 29.02. in einem Nicht-Schaltjahr
+    map[fmtDate(d)] = ch;
+  });
+  return map;
+}
+/* Alle Feiertage eines Jahres als {dateStr: name}. Ein eigener Eintrag
+   überschreibt einen gesetzlichen Feiertag am selben Tag. */
+function getHolidaysForYear(year){
+  const map = Object.assign({}, getOfficialHolidaysForYear(year));
+  Object.entries(getCustomHolidaysForYear(year)).forEach(([d,ch])=>{ map[d] = ch.name; });
+  return map;
+}
+/* Feiertagsinfo zu einem Datum: Name, hinterlegte Sollstunden (bei
+   gesetzlichen Feiertagen immer 0) und ob es ein eigener Eintrag ist. */
+function getHolidayInfo(dateStr){
   const year = parseInt(dateStr.slice(0,4),10);
-  return getHolidaysForYear(year)[dateStr] || null;
+  const custom = getCustomHolidaysForYear(year)[dateStr];
+  if(custom) return {name: custom.name, sollStunden: Number(custom.sollStunden)||0, custom:true};
+  const official = getOfficialHolidaysForYear(year)[dateStr];
+  if(official) return {name: official, sollStunden: 0, custom:false};
+  return null;
+}
+function getHoliday(dateStr){
+  const info = getHolidayInfo(dateStr);
+  return info ? info.name : null;
 }
 
 /* ---------- Tagesberechnung ---------- */
@@ -644,7 +703,8 @@ function getDayInfo(dateStr){
   const d = parseLocalDate(dateStr);
   const dow = d.getDay();
   const isWeekend = dow===0 || dow===6;
-  const holidayName = getHoliday(dateStr);
+  const holidayInfo = getHolidayInfo(dateStr);
+  const holidayName = holidayInfo ? holidayInfo.name : null;
   const entry = state.days[dateStr] || {};
   const beschaeftigungsgrad = getBeschaeftigungsgrad(dateStr);
   const sollTag = state.settings.sollstundenTag * 60 * (beschaeftigungsgrad/100);
@@ -655,12 +715,17 @@ function getDayInfo(dateStr){
   if(holidayName && !['urlaub','krankenstand'].includes(typ)) typ = 'feiertag';
 
   const hasSollOverride = entry.sollOverride!=null && entry.sollOverride!=='' && !isNaN(Number(entry.sollOverride));
+  /* Sollzeit, die an einem Feiertag ohne Tagesausnahme gilt: bei gesetzlichen
+     Feiertagen 0, bei eigenen Einträgen der dort hinterlegte Wert (z. B. 4 Std
+     am 24.12.) - anteilig zum Beschäftigungsgrad und nur an Werktagen. */
+  const holidaySoll = (holidayInfo && holidayInfo.sollStunden && !isWeekend)
+    ? Math.round(holidayInfo.sollStunden * 60 * (beschaeftigungsgrad/100))
+    : 0;
   let soll = 0;
   if(holidayName){
-    // An einem Feiertag gibt es grundsätzlich keine Sollzeit, außer für diesen
-    // Tag wurde bewusst ein eigener Wert eingetragen - das gilt unabhängig
-    // davon, ob der Typ Feiertag, Urlaub oder Krankenstand ist.
-    soll = hasSollOverride ? Math.round(Number(entry.sollOverride)*60) : 0;
+    // Ein Wert im Feld "Soll (Std)" beim einzelnen Tag hat immer Vorrang - das
+    // gilt unabhängig davon, ob der Typ Feiertag, Urlaub oder Krankenstand ist.
+    soll = hasSollOverride ? Math.round(Number(entry.sollOverride)*60) : holidaySoll;
   } else if(!isWeekend){
     soll = sollTag;
   }
@@ -689,7 +754,8 @@ function getDayInfo(dateStr){
     : (((WORK_LIKE_TYPES.includes(typ) || typ==='feiertag' || typ==='krankenstand') && shift) ? workedMinutes(shift.start, shift.end) : 0);
   const saldo = ist - soll;
   return {
-    dateStr, dow, isWeekend, holidayName, typ, soll, ist, saldo, planzeitMinutes,
+    dateStr, dow, isWeekend, holidayName, holidaySoll, holidayCustom: !!(holidayInfo && holidayInfo.custom),
+    typ, soll, ist, saldo, planzeitMinutes,
     shiftId: entry.shiftId || '', segments, kommenCapped, kommenCappedTo, zeitzugang,
     bereitschaft: entry.bereitschaft || [],
     sollOverride: (entry.sollOverride!=null ? entry.sollOverride : ''),
@@ -1045,7 +1111,7 @@ function renderMonth(){
          </select>
          <div class="holiday-soll">
            <label for="fs-${dateStr}">Soll (Std)</label>
-           <input type="number" id="fs-${dateStr}" step="0.25" min="0" class="feiertagSollInput" data-date="${dateStr}" value="${info.sollOverride}" placeholder="0">
+           <input type="number" id="fs-${dateStr}" step="0.25" min="0" class="feiertagSollInput" data-date="${dateStr}" value="${info.sollOverride}" placeholder="${Math.round(info.holidaySoll/60*100)/100}">
          </div>`
       : `<select data-date="${dateStr}" class="typSelect">${typOptions}</select>`;
 
@@ -1314,10 +1380,13 @@ function renderAbwesenheiten(){
   `;
 
   const holidayList = document.getElementById('holidayList');
+  const custom = getCustomHolidaysForYear(now.getFullYear());
   const entries = Object.entries(holidays).sort((a,b)=>a[0]<b[0]?-1:1);
   holidayList.innerHTML = entries.map(([d,name])=>{
     const dt = parseLocalDate(d);
-    return `<div>${pad(dt.getDate())}.${pad(dt.getMonth()+1)}.${dt.getFullYear()} — ${escapeHtml(name)} <span class="muted">(${WOCHENTAGE[dt.getDay()]})</span></div>`;
+    const ch = custom[d];
+    const zusatz = ch ? ` <span class="muted">· eigener Eintrag, Soll ${Number(ch.sollStunden)||0} Std</span>` : '';
+    return `<div>${pad(dt.getDate())}.${pad(dt.getMonth()+1)}.${dt.getFullYear()} — ${escapeHtml(name)} <span class="muted">(${WOCHENTAGE[dt.getDay()]})</span>${zusatz}</div>`;
   }).join('');
 
   const dpSchicht = document.getElementById('dpSchicht');
@@ -1341,6 +1410,37 @@ function renderSettingsForm(){
   document.getElementById('setSollstunden').value = state.settings.sollstundenTag;
   document.getElementById('setUrlaubsanspruch').value = state.settings.urlaubsanspruch;
   renderBeschaeftigungsgrad();
+  renderCustomHolidays();
+}
+function renderCustomHolidays(){
+  const list = document.getElementById('chList');
+  const entries = (state.customHolidays||[]).slice().sort((a,b)=>
+    (Number(a.monat)-Number(b.monat)) || (Number(a.tag)-Number(b.tag)) || ((a.jahr||0)-(b.jahr||0)));
+  if(entries.length===0){
+    list.innerHTML = '<p class="muted">Keine eigenen Feiertage angelegt – es gilt nur die gesetzliche Liste.</p>';
+    return;
+  }
+  list.innerHTML = entries.map(ch=>{
+    const datum = pad(Number(ch.tag))+'.'+pad(Number(ch.monat))+'.'+(ch.jahr!=null ? ch.jahr : '');
+    const soll = Number(ch.sollStunden)||0;
+    return `
+    <div class="shift-row" data-id="${ch.id}">
+      <div class="name">${datum}</div>
+      <div class="time">${escapeHtml(ch.name)}</div>
+      <div class="time">Soll ${soll} Std</div>
+      <div class="time">${ch.jahr!=null ? 'nur '+ch.jahr : 'jedes Jahr'}</div>
+      <div class="spacer"></div>
+      <button class="btn danger small chDeleteBtn">Löschen</button>
+    </div>`;
+  }).join('');
+  list.querySelectorAll('.chDeleteBtn').forEach(btn=>{
+    btn.addEventListener('click', e=>{
+      const id = e.target.closest('.shift-row').dataset.id;
+      state.customHolidays = (state.customHolidays||[]).filter(c=>c.id!==id);
+      scheduleSave(); renderCustomHolidays(); renderMonth(); renderDashboard(); renderAbwesenheiten();
+      showToast('Feiertag gelöscht');
+    });
+  });
 }
 function renderBeschaeftigungsgrad(){
   const list = document.getElementById('bgList');
@@ -1449,26 +1549,41 @@ function exportIcal(){
   const year = y, monthIdx = m-1;
   const dates = getMonthDates(year, monthIdx);
   const dtstamp = icsTimestampNow();
-  const lines = ['BEGIN:VCALENDAR','VERSION:2.0','PRODID:-//Zeiterfassung//DE','CALSCALE:GREGORIAN'];
+  const lines = ['BEGIN:VCALENDAR','VERSION:2.0','PRODID:-//Zeiterfassung//DE','CALSCALE:GREGORIAN',
+    'X-WR-CALNAME:Dienste','X-APPLE-CALENDAR-COLOR:#FF0000'];
   let count = 0;
   dates.forEach(dateStr=>{
     const info = getDayInfo(dateStr);
     const shift = state.shifts.find(s=>s.id===info.shiftId);
-    if(!shift) return;
-    if(!(info.typ==='arbeit' || info.typ==='frei' || info.typ==='feiertag')) return;
-    const endDateStr = shift.isNight ? fmtDate(addDaysToDate(parseLocalDate(dateStr),1)) : dateStr;
+    const hatDienst = shift && (info.typ==='arbeit' || info.typ==='frei' || info.typ==='feiertag');
+    // Bereitschaftskuerzel klein und in fester Reihenfolge (ELB, BN, BT)
+    const bereitschaft = BEREITSCHAFT_TYPES
+      .filter(bt=>info.bereitschaft.includes(bt.code))
+      .map(bt=>bt.code.toLowerCase());
+    if(!hatDienst && bereitschaft.length===0) return;
     lines.push('BEGIN:VEVENT');
-    lines.push('UID:'+dateStr+'-'+shift.id+'@zeiterfassung');
-    lines.push('DTSTAMP:'+dtstamp);
-    lines.push('DTSTART:'+icsDateTime(dateStr, shift.start));
-    lines.push('DTEND:'+icsDateTime(endDateStr, shift.end));
-    lines.push('SUMMARY:L '+icsEscape(shift.name));
-    lines.push('COLOR:yellow');
+    if(hatDienst){
+      // Dienst-Termin: Bereitschaften haengen hinten am Titel ("L EL elb")
+      const endDateStr = shift.isNight ? fmtDate(addDaysToDate(parseLocalDate(dateStr),1)) : dateStr;
+      lines.push('UID:'+dateStr+'-'+shift.id+'@zeiterfassung');
+      lines.push('DTSTAMP:'+dtstamp);
+      lines.push('DTSTART:'+icsDateTime(dateStr, shift.start));
+      lines.push('DTEND:'+icsDateTime(endDateStr, shift.end));
+      lines.push('SUMMARY:L '+icsEscape(shift.name)+(bereitschaft.length ? ' '+bereitschaft.join(' ') : ''));
+    } else {
+      // Nur Bereitschaft, kein Dienst: fester Zeitrahmen, im Titel nur die Kuerzel
+      lines.push('UID:'+dateStr+'-bereitschaft@zeiterfassung');
+      lines.push('DTSTAMP:'+dtstamp);
+      lines.push('DTSTART:'+icsDateTime(dateStr, ICAL_BEREITSCHAFT_START));
+      lines.push('DTEND:'+icsDateTime(dateStr, ICAL_BEREITSCHAFT_END));
+      lines.push('SUMMARY:L '+bereitschaft.join(' '));
+    }
+    lines.push('COLOR:red');
     lines.push('END:VEVENT');
     count++;
   });
   lines.push('END:VCALENDAR');
-  if(count===0){ showToast('Keine Schichten in diesem Monat gefunden'); return; }
+  if(count===0){ showToast('Keine Dienste oder Bereitschaften in diesem Monat gefunden'); return; }
   downloadFile('schichten-'+year+'-'+pad(monthIdx+1)+'.ics', lines.join('\r\n'), 'text/calendar;charset=utf-8');
   showToast(count+' Termin(e) exportiert');
 }
@@ -1596,6 +1711,30 @@ function bindEvents(){
     else{ state.beschaeftigungsgrad[monat] = prozent; }
     scheduleSave(); renderBeschaeftigungsgrad(); renderMonth(); renderDashboard();
     showToast('Beschäftigungsgrad gespeichert');
+  });
+
+  document.getElementById('chAddBtn').addEventListener('click', ()=>{
+    const datum = document.getElementById('chDatum').value;
+    const name = document.getElementById('chName').value.trim();
+    const sollRaw = document.getElementById('chSoll').value;
+    const jaehrlich = document.getElementById('chJaehrlich').checked;
+    if(!datum){ showToast('Bitte ein Datum wählen'); return; }
+    if(!name){ showToast('Bitte eine Bezeichnung eingeben'); return; }
+    const soll = parseFloat(sollRaw);
+    if(isNaN(soll) || soll<0 || soll>24){ showToast('Sollstunden müssen zwischen 0 und 24 liegen'); return; }
+    const [y,m,t] = datum.split('-').map(Number);
+    if(!state.customHolidays) state.customHolidays = [];
+    const jahr = jaehrlich ? null : y;
+    // Gleicher Tag mit gleicher Wiederholung wird überschrieben statt doppelt angelegt
+    const vorhanden = state.customHolidays.find(c=>Number(c.tag)===t && Number(c.monat)===m && (c.jahr==null?null:Number(c.jahr))===jahr);
+    if(vorhanden){
+      vorhanden.name = name; vorhanden.sollStunden = soll;
+    } else {
+      state.customHolidays.push({id:uid(), name, tag:t, monat:m, jahr, sollStunden:soll});
+    }
+    document.getElementById('chName').value = '';
+    scheduleSave(); renderCustomHolidays(); renderMonth(); renderDashboard(); renderAbwesenheiten();
+    showToast('Feiertag gespeichert');
   });
 
   document.getElementById('exportJsonBtn').addEventListener('click', exportJson);
