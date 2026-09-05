@@ -119,12 +119,25 @@
   .seg-add{background:none; border:1px dashed var(--border); color:var(--accent); cursor:pointer; font-size:0.78em; padding:3px 8px; border-radius:6px; flex:none; white-space:nowrap; margin-left:4px;}
   .seg-add:disabled{cursor:not-allowed; opacity:.4;}
   .cap-hint{font-size:0.72em; color:var(--amber); cursor:help; margin-top:-2px;}
+  .rundung-off{display:flex; align-items:center; gap:5px; font-size:0.72em; color:var(--text-dim); white-space:nowrap; cursor:pointer;}
+  .rundung-off input{width:auto; min-width:0;}
+  textarea{
+    background:var(--bg); border:1px solid var(--border); color:var(--text); border-radius:6px;
+    padding:7px 8px; font-size:14px; width:100%; font-family:inherit; resize:vertical;
+  }
+  .plan-row{display:flex; gap:8px; align-items:baseline; padding:3px 0; border-top:1px solid var(--border); font-size:13px;}
+  .plan-row:first-child{border-top:none;}
+  .plan-row .tag{font-weight:700; min-width:74px;}
+  .plan-row .warn{color:var(--amber);}
+  .plan-row .err{color:var(--red);}
+  .plan-row .skip{color:var(--text-dim); font-style:italic;}
   .bs-cell{display:flex; flex-direction:column; gap:3px; min-width:52px;}
-  .bs-pill{
+  .bs-pill, .bs-pill-modal{
     background:var(--bg); border:1px solid var(--border); color:var(--text-dim); cursor:pointer;
     font-size:10.5px; font-weight:700; padding:3px 6px; border-radius:6px; letter-spacing:.3px;
   }
-  .bs-pill.active{background:var(--accent); border-color:var(--accent); color:#fff;}
+  .bs-pill.active, .bs-pill-modal.active{background:var(--accent); border-color:var(--accent); color:#fff;}
+  .bs-pill-modal{font-size:13px; padding:7px 14px;}
   td.saldo{font-weight:700; font-variant-numeric:tabular-nums;}
   td.ist{font-variant-numeric:tabular-nums;}
   .soll-inline{display:block; color:var(--text-dim); font-size:0.72em; font-weight:500; margin-top:2px;}
@@ -140,6 +153,50 @@
   .shift-row .time{color:var(--text-dim); font-size:13px;}
   .shift-row .spacer{flex:1;}
   .night-badge{font-size:10.5px; background:var(--accent-dim); color:var(--accent); padding:2px 7px; border-radius:20px; font-weight:700;}
+
+  /* Kalenderansicht */
+  .cal-head{display:grid; grid-template-columns:repeat(7,1fr); gap:6px; margin-bottom:6px;}
+  .cal-head div{font-size:11px; text-transform:uppercase; letter-spacing:.3px; color:var(--text-dim); font-weight:700; text-align:center;}
+  .cal-grid{display:grid; grid-template-columns:repeat(7,1fr); gap:6px;}
+  .cal-cell{
+    min-height:104px; border:1px solid var(--border); border-radius:8px; background:var(--bg-alt);
+    padding:6px; display:flex; flex-direction:column; gap:4px; cursor:pointer; overflow:hidden;
+  }
+  .cal-cell.empty{border:none; background:none; cursor:default;}
+  .cal-cell:not(.empty):hover{border-color:var(--accent);}
+  .cal-cell.weekend{background:var(--bg);}
+  .cal-cell.holiday{background:var(--amber-bg);}
+  .cal-cell.today{outline:2px solid var(--accent); outline-offset:-2px;}
+  .cal-day{display:flex; justify-content:space-between; align-items:baseline; font-weight:700; font-size:13px;}
+  .cal-day .wd{font-weight:500; font-size:10.5px; color:var(--text-dim); text-transform:uppercase;}
+  .cal-badge{font-size:11px; font-weight:700; padding:2px 6px; border-radius:6px; align-self:flex-start;
+    background:var(--accent-dim); color:var(--accent); white-space:nowrap; max-width:100%; overflow:hidden; text-overflow:ellipsis;}
+  .cal-badge.urlaub{background:var(--green-bg); color:var(--green);}
+  .cal-badge.krank{background:var(--red-bg); color:var(--red);}
+  .cal-note{font-size:10.5px; color:var(--text-dim); line-height:1.25;}
+  .cal-bs{display:flex; gap:3px; flex-wrap:wrap;}
+  .cal-bs-pill{font-size:9.5px; font-weight:700; padding:1px 5px; border-radius:5px; border:1px solid var(--border); color:var(--text-dim);}
+  .cal-foot{margin-top:auto; font-size:10.5px; font-variant-numeric:tabular-nums; color:var(--text-dim); display:flex; gap:6px; justify-content:space-between;}
+  .cal-foot .pos{color:var(--green); font-weight:700;}
+  .cal-foot .neg{color:var(--red); font-weight:700;}
+  @media (max-width:760px){
+    .cal-cell{min-height:74px; padding:4px; gap:2px;}
+    .cal-badge{font-size:9.5px; padding:1px 4px;}
+    .cal-note, .cal-foot{font-size:9px;}
+  }
+
+  /* Tages-Schnelleingabe aus der Kalenderansicht */
+  .modal-back{
+    position:fixed; inset:0; background:rgba(10,16,24,.55); z-index:150;
+    display:flex; align-items:center; justify-content:center; padding:16px;
+  }
+  .modal-back.hidden{display:none;}
+  .modal-card{width:100%; max-width:380px; max-height:90vh; overflow:auto;}
+  .modal-card h2{margin-bottom:2px;}
+  .modal-card .field{margin-top:12px;}
+  .modal-bs{display:flex; gap:6px; flex-wrap:wrap; margin-top:4px;}
+  .modal-actions{display:flex; gap:8px; margin-top:18px; flex-wrap:wrap;}
+  .modal-actions .btn{flex:1; justify-content:center; white-space:nowrap;}
 
   .abw-summary{display:grid; grid-template-columns:repeat(auto-fit,minmax(150px,1fr)); gap:12px; margin-bottom:20px;}
   .toast{
@@ -208,11 +265,12 @@
   <div class="card auth-card">
     <h2 id="authTitle">Anmelden</h2>
     <p class="muted">Melde dich an, um deine Zeiterfassungsdaten geräteübergreifend zu speichern.</p>
-    <div class="field"><label>E-Mail</label><input type="text" id="authEmail" autocomplete="username"></div>
-    <div class="field"><label>Passwort</label><input type="password" id="authPassword" autocomplete="current-password"></div>
-    <button class="btn" id="authSubmitBtn">Anmelden</button>
+    <form id="authForm">
+      <div class="field"><label>E-Mail</label><input type="text" id="authEmail" autocomplete="username"></div>
+      <div class="field"><label>Passwort</label><input type="password" id="authPassword" autocomplete="current-password"></div>
+      <button class="btn" id="authSubmitBtn" type="submit">Anmelden</button>
+    </form>
     <div class="auth-error" id="authError"></div>
-    <div class="switch-mode" id="authSwitchMode">Noch kein Konto? <a id="authSwitchLink">Registrieren</a></div>
   </div>
 </div>
 
@@ -234,6 +292,7 @@
 <nav id="tabNav">
   <button data-tab="dashboard" class="active">Dashboard</button>
   <button data-tab="monat">Monatsansicht</button>
+  <button data-tab="kalender">Kalender</button>
   <button data-tab="schichten">Schichten</button>
   <button data-tab="abwesenheiten">Abwesenheiten</button>
   <button data-tab="einstellungen">Einstellungen &amp; Daten</button>
@@ -308,7 +367,33 @@
         </tfoot>
       </table>
     </div>
-    <p class="muted" style="margin-top:8px;">„Kontostand" zeigt die laufende Berechnung deiner Stunden zu diesem Zeitpunkt – also den Saldo inklusive Startsaldo, aufsummiert bis einschließlich des jeweiligen Tages. Stempelst du beim ersten Zeitpaar des Tages mehr als 10 Minuten vor Beginn der ausgewählten Schicht ein, zählt für die Berechnung nur die Zeit ab „Schichtbeginn − 10 Minuten“ – ein kleiner Hinweis zeigt dir dann die gekappte Zeit an (bei der Schicht mit Kürzel „SD“ entfällt diese Kappung, dort zählt immer die tatsächliche Stempelzeit). Die Monatssumme unten enthält zusätzlich die gesamte geplante Schichtzeit (Planzeit) des Monats. Bei „Bereitschaft“ kannst du pro Tag mehrere Bereitschaftstypen gleichzeitig markieren – das fließt nicht in Soll/Ist/Saldo ein, sondern ist reine Zusatzinfo. An Feiertagen kannst du ganz normal Schicht und Zeiten eintragen; die Sollzeit bleibt dabei 0, außer du trägst im Feld „Soll (Std)“ bei diesem Tag bewusst einen eigenen Wert ein. Tage, die nicht in der gesetzlichen Liste stehen, aber bei dir wie ein Feiertag zählen (z. B. der 24.12. als halber Feiertag), legst du unter „Einstellungen → Eigene Feiertage“ mit eigener Sollstundenzahl an – der graue Platzhalter im Feld „Soll (Std)“ zeigt dir dann, welcher Wert für diesen Tag hinterlegt ist. Der Typ steht standardmäßig auf „Arbeit/Frei (automatisch)“ – sobald du eine Schicht auswählst, wird automatisch „Arbeit“ daraus, ohne Schicht bleibt es „Frei“. Nur für Urlaub oder Krankenstand wählst du den Typ bewusst manuell aus; bei Krankenstand kannst du zusätzlich eine Schicht angeben, dann wird die Ist-Zeit automatisch auf deren Dauer gesetzt (Soll bleibt normal). „Zeitzugang" addiert einen frei eingegebenen Stundenwert (hh:mm) zur Ist-Zeit des Tages, egal welcher Typ eingetragen ist.</p>
+    <p class="muted" style="margin-top:8px;">„Kontostand" zeigt die laufende Berechnung deiner Stunden zu diesem Zeitpunkt – also den Saldo inklusive Startsaldo, aufsummiert bis einschließlich des jeweiligen Tages. Stempelst du beim ersten Zeitpaar des Tages mehr als 10 Minuten vor Beginn der ausgewählten Schicht ein, zählt für die Berechnung nur die Zeit ab „Schichtbeginn − 10 Minuten“ – ein kleiner Hinweis zeigt dir dann die gekappte Zeit an (bei der Schicht mit Kürzel „SD“ entfällt diese Kappung, dort zählt immer die tatsächliche Stempelzeit). Für einzelne Ausnahmetage kannst du die Kappung mit dem Häkchen „keine Rundung“ bei den Zeiten abschalten – dann zählt an genau diesem Tag die tatsächliche Stempelzeit. Die Monatssumme unten enthält zusätzlich die gesamte geplante Schichtzeit (Planzeit) des Monats. Bei „Bereitschaft“ kannst du pro Tag mehrere Bereitschaftstypen gleichzeitig markieren – das fließt nicht in Soll/Ist/Saldo ein, sondern ist reine Zusatzinfo. An Feiertagen kannst du ganz normal Schicht und Zeiten eintragen; die Sollzeit bleibt dabei 0, außer du trägst im Feld „Soll (Std)“ bei diesem Tag bewusst einen eigenen Wert ein. Tage, die nicht in der gesetzlichen Liste stehen, aber bei dir wie ein Feiertag zählen (z. B. der 24.12. als halber Feiertag), legst du unter „Einstellungen → Eigene Feiertage“ mit eigener Sollstundenzahl an – der graue Platzhalter im Feld „Soll (Std)“ zeigt dir dann, welcher Wert für diesen Tag hinterlegt ist. Der Typ steht standardmäßig auf „Arbeit/Frei (automatisch)“ – sobald du eine Schicht auswählst, wird automatisch „Arbeit“ daraus, ohne Schicht bleibt es „Frei“. Nur für Urlaub oder Krankenstand wählst du den Typ bewusst manuell aus; bei Krankenstand kannst du zusätzlich eine Schicht angeben, dann wird die Ist-Zeit automatisch auf deren Dauer gesetzt (Soll bleibt normal). „Zeitzugang" addiert einen frei eingegebenen Stundenwert (hh:mm) zur Ist-Zeit des Tages, egal welcher Typ eingetragen ist.</p>
+  </section>
+
+  <!-- KALENDER -->
+  <section class="view" id="view-kalender">
+    <div class="month-nav">
+      <button class="btn ghost small" id="calPrev">‹ Zurück</button>
+      <div class="title" id="calTitle"></div>
+      <button class="btn ghost small" id="calNext">Weiter ›</button>
+      <button class="btn secondary small" id="calToday">Heute</button>
+      <div class="field" style="max-width:170px; margin-left:8px;">
+        <input type="month" id="calMonthPick" aria-label="Monat auswählen">
+      </div>
+    </div>
+    <div class="legend">
+      <span><span class="swatch" style="background:var(--bg)"></span>Wochenende</span>
+      <span><span class="swatch" style="background:var(--amber-bg)"></span>Feiertag</span>
+      <span><span class="swatch" style="background:var(--green-bg)"></span>Urlaub</span>
+      <span><span class="swatch" style="background:var(--red-bg)"></span>Krankenstand</span>
+      <span><span class="swatch" style="background:var(--accent)"></span>heute</span>
+      <span>Klick auf einen Tag öffnet die Schnelleingabe</span>
+    </div>
+    <div class="cal-head">
+      <div>Mo</div><div>Di</div><div>Mi</div><div>Do</div><div>Fr</div><div>Sa</div><div>So</div>
+    </div>
+    <div class="cal-grid" id="calGrid"></div>
+    <div class="abw-summary" id="calSummary" style="margin-top:18px;"></div>
   </section>
 
   <!-- SCHICHTEN -->
@@ -357,6 +442,27 @@
       </div>
       <button class="btn" id="dpApplyBtn" style="margin-top:12px;">Übernehmen</button>
       <p class="muted" id="dpHint" style="margin-top:8px;"></p>
+    </div>
+    <div class="card">
+      <h2>Dienstplan als Text übernehmen</h2>
+      <p class="muted">Plan abtippen oder einfügen – Tagesnummer, dann Kürzel, z. B. <b>1. EL 2. leer 3. EL 4. SD ELB</b>. Zeilenumbrüche, Kommas, Klammern und Punkte sind egal. Erkannt werden die Kürzel und Namen deiner Schichten, die Bereitschaften ELB/BN/BT sowie <b>leer</b>/<b>frei</b>/<b>–</b>, <b>U</b>/<b>Urlaub</b> und <b>K</b>/<b>Krank</b>. Erst die Vorschau ansehen, dann eintragen – Stempelzeiten bleiben immer unangetastet.</p>
+      <div class="form-grid">
+        <div class="field"><label>Monat</label><input type="month" id="planMonat"></div>
+        <div class="field" style="display:flex; align-items:flex-end;">
+          <label style="display:flex; align-items:center; gap:6px; font-size:13px; color:var(--text-dim); font-weight:500;">
+            <input type="checkbox" id="planSchutz" checked style="width:auto;"> Tage mit erfassten Zeiten überspringen
+          </label>
+        </div>
+      </div>
+      <div class="field" style="margin-top:10px;">
+        <label>Plan</label>
+        <textarea id="planText" rows="4" placeholder="1. EL  2. leer  3. EL  4. SD ELB  5. U …"></textarea>
+      </div>
+      <div class="row-gap" style="margin-top:12px;">
+        <button class="btn secondary" id="planPreviewBtn">Vorschau</button>
+        <button class="btn" id="planApplyBtn" disabled>Eintragen</button>
+      </div>
+      <div id="planPreview" style="margin-top:14px;"></div>
     </div>
     <div class="card">
       <h2>Zeitraum als Abwesenheit eintragen</h2>
@@ -467,6 +573,24 @@
 </main>
 
 <div class="toast" id="toast"></div>
+
+<div class="modal-back hidden" id="dayModal">
+  <div class="card modal-card">
+    <h2 id="dayModalTitle">–</h2>
+    <p class="muted" id="dayModalSub"></p>
+    <div class="field"><label>Typ</label><select id="dayModalTyp"></select></div>
+    <div class="field"><label>Schicht</label><select id="dayModalShift"></select></div>
+    <div class="field"><label>Bereitschaft</label><div class="modal-bs" id="dayModalBs"></div></div>
+    <div class="modal-actions">
+      <button class="btn" id="dayModalSave">Speichern</button>
+      <button class="btn secondary" id="dayModalCancel">Abbrechen</button>
+    </div>
+    <div class="modal-actions">
+      <button class="btn ghost small" id="dayModalOpenMonth">Zeiten eintragen →</button>
+      <button class="btn danger small" id="dayModalClear">Tag leeren</button>
+    </div>
+  </div>
+</div>
 
 </div><!-- /#app-root -->
 
@@ -732,6 +856,10 @@ function getDayInfo(dateStr){
 
   let ist = 0;
   let kommenCapped = false, kommenCappedTo = null;
+  /* Pro Tag abschaltbar: dann zaehlt die tatsaechliche Stempelzeit, auch wenn
+     mehr als KOMMEN_CAP_MINUTES vor Schichtbeginn eingestempelt wurde. */
+  const rundungAus = !!entry.keineRundung;
+  let rundungGriffNicht = false;
   if(typ === 'urlaub'){
     ist = soll;
   } else if(typ === 'krankenstand'){
@@ -741,6 +869,10 @@ function getDayInfo(dateStr){
     ist = segments.reduce((acc,seg,idx)=>{
       if(idx===0 && shift && seg.kommen && !isSD){
         const cap = capEarlyKommen(seg.kommen, shift.start);
+        if(cap.capped && rundungAus){
+          rundungGriffNicht = true;
+          return acc + workedMinutes(seg.kommen, seg.gehen);
+        }
         if(cap.capped){ kommenCapped = true; kommenCappedTo = cap.effective; }
         return acc + workedMinutes(cap.effective, seg.gehen);
       }
@@ -757,6 +889,7 @@ function getDayInfo(dateStr){
     dateStr, dow, isWeekend, holidayName, holidaySoll, holidayCustom: !!(holidayInfo && holidayInfo.custom),
     typ, soll, ist, saldo, planzeitMinutes,
     shiftId: entry.shiftId || '', segments, kommenCapped, kommenCappedTo, zeitzugang,
+    keineRundung: rundungAus, rundungGriffNicht,
     bereitschaft: entry.bereitschaft || [],
     sollOverride: (entry.sollOverride!=null ? entry.sollOverride : ''),
     bemerkung: entry.bemerkung || '',
@@ -1131,7 +1264,13 @@ function renderMonth(){
         ${idx===lastIdx ? `<button type="button" class="seg-add" data-date="${dateStr}" ${disabledTimes} title="Weiteres Zeitpaar">+ Zeit</button>` : ''}
       </div>
       ${idx===0 && info.kommenCapped ? `<div class="cap-hint" title="Mehr als ${KOMMEN_CAP_MINUTES} Min. vor Schichtbeginn eingestempelt – für die Berechnung zählt erst ab ${info.kommenCappedTo} Uhr">⏱ gekappt auf ${info.kommenCappedTo}</div>` : ''}`).join('');
-    const zeitenCell = `<div class="zeiten-cell">${segsHtml}</div>`;
+    const rundungHint = info.rundungGriffNicht
+      ? `<div class="cap-hint" title="Für diesen Tag ist die Rundung abgeschaltet – es zählt die tatsächliche Stempelzeit">⏱ Rundung aus – ${info.segments[0].kommen} zählt voll</div>`
+      : '';
+    const rundungRow = `<label class="rundung-off" title="Rundung auf ${KOMMEN_CAP_MINUTES} Min. vor Schichtbeginn nur für diesen Tag abschalten">
+        <input type="checkbox" class="rundungCheck" data-date="${dateStr}" ${info.keineRundung?'checked':''} ${disabledTimes}> keine Rundung
+      </label>`;
+    const zeitenCell = `<div class="zeiten-cell">${segsHtml}${rundungHint}${rundungRow}</div>`;
 
     const kontostandLaufend = getBalanceUpTo(dateStr);
 
@@ -1179,6 +1318,14 @@ function attachMonthRowListeners(){
       const date = e.target.dataset.date;
       const entry = ensureDay(date);
       entry.typ = e.target.value ? e.target.value : (entry.shiftId ? 'arbeit' : 'frei');
+      scheduleSave(); renderMonth(); renderDashboard();
+    });
+  });
+  document.querySelectorAll('.rundungCheck').forEach(el=>{
+    el.addEventListener('change', e=>{
+      const date = e.target.dataset.date;
+      const entry = ensureDay(date);
+      entry.keineRundung = e.target.checked;
       scheduleSave(); renderMonth(); renderDashboard();
     });
   });
@@ -1354,6 +1501,238 @@ function isOvernightShift(start, end){
   return timeToNum(end) <= timeToNum(start);
 }
 
+/* ---------- Rendering: Kalenderansicht ---------- */
+function renderKalender(){
+  document.getElementById('calTitle').textContent = MONATE[viewMonth] + ' ' + viewYear;
+  document.getElementById('calMonthPick').value = viewYear + '-' + pad(viewMonth+1);
+
+  const dates = getMonthDates(viewYear, viewMonth);
+  const t = todayStr();
+  // Woche beginnt am Montag, deshalb Sonntag (0) auf Position 6 schieben
+  const leerVorne = (parseLocalDate(dates[0]).getDay() + 6) % 7;
+  const cells = [];
+  for(let i=0; i<leerVorne; i++) cells.push('<div class="cal-cell empty"></div>');
+
+  dates.forEach(dateStr=>{
+    const info = getDayInfo(dateStr);
+    const d = parseLocalDate(dateStr);
+    const shift = state.shifts.find(s=>s.id===info.shiftId);
+    const cls = ['cal-cell'];
+    if(info.isWeekend) cls.push('weekend');
+    if(info.holidayName) cls.push('holiday');
+    if(dateStr===t) cls.push('today');
+
+    let badge = '';
+    if(info.typ==='urlaub') badge = '<span class="cal-badge urlaub">Urlaub</span>';
+    else if(info.typ==='krankenstand') badge = '<span class="cal-badge krank">Krank'+(shift?' · '+escapeHtml(shift.kuerzel||shift.name):'')+'</span>';
+    else if(shift) badge = '<span class="cal-badge">'+escapeHtml(shift.kuerzel||shift.name)+(shift.isNight?' 🌙':'')+'</span>';
+
+    const note = info.holidayName ? '<div class="cal-note">'+escapeHtml(info.holidayName)+'</div>' : '';
+    const bsCodes = BEREITSCHAFT_TYPES.filter(bt=>info.bereitschaft.includes(bt.code)).map(bt=>bt.code);
+    const bs = bsCodes.length
+      ? '<div class="cal-bs">'+bsCodes.map(c=>'<span class="cal-bs-pill">'+c+'</span>').join('')+'</div>'
+      : '';
+    const saldoCls = info.saldo>0 ? 'pos' : (info.saldo<0 ? 'neg' : '');
+    const foot = (info.ist || info.soll)
+      ? '<div class="cal-foot"><span>'+fmtHM(info.ist)+'</span><span class="'+saldoCls+'">'+fmtHMSigned(info.saldo)+'</span></div>'
+      : '';
+
+    cells.push(
+      '<div class="'+cls.join(' ')+'" data-date="'+dateStr+'" title="'+pad(d.getDate())+'.'+pad(d.getMonth()+1)+'.'+d.getFullYear()+'">'
+      + '<div class="cal-day"><span>'+d.getDate()+'</span><span class="wd">'+WOCHENTAGE[d.getDay()]+'</span></div>'
+      + badge + note + bs + foot
+      + '</div>'
+    );
+  });
+
+  document.getElementById('calGrid').innerHTML = cells.join('');
+
+  const stats = getMonthStats(viewYear, viewMonth, false);
+  const cls = v => v>0 ? 'pos' : (v<0 ? 'neg' : 'neutral');
+  document.getElementById('calSummary').innerHTML = `
+    <div class="card stat"><div class="label">Soll</div><div class="value neutral">${fmtHM(stats.soll)}</div><div class="sub">ganzer Monat</div></div>
+    <div class="card stat"><div class="label">Ist</div><div class="value neutral">${fmtHM(stats.ist)}</div></div>
+    <div class="card stat"><div class="label">Saldo</div><div class="value ${cls(stats.saldo)}">${fmtHMSigned(stats.saldo)}</div><div class="sub">Ist − Soll</div></div>
+    <div class="card stat"><div class="label">Planzeit</div><div class="value neutral">${fmtHM(stats.planzeit)}</div><div class="sub">geplante Schichtzeit</div></div>
+  `;
+}
+
+/* ---------- Tages-Schnelleingabe (Kalenderansicht) ---------- */
+let dayModalDate = null;
+
+function openDayModal(dateStr){
+  dayModalDate = dateStr;
+  const info = getDayInfo(dateStr);
+  const d = parseLocalDate(dateStr);
+  document.getElementById('dayModalTitle').textContent =
+    pad(d.getDate())+'.'+pad(d.getMonth()+1)+'.'+d.getFullYear();
+  document.getElementById('dayModalSub').textContent =
+    WOCHENTAGE[d.getDay()] + (info.holidayName ? ' · '+info.holidayName : '') + ' · Soll ' + fmtHM(info.soll);
+
+  // "automatisch" heisst: Arbeit sobald eine Schicht gewaehlt ist, sonst Frei
+  const autoLabel = info.holidayName ? 'Feiertag' : (info.shiftId ? 'Arbeit' : 'Frei');
+  const typSel = document.getElementById('dayModalTyp');
+  typSel.innerHTML = '<option value="">'+autoLabel+' (automatisch)</option>'
+    + ['urlaub','krankenstand'].map(k=>'<option value="'+k+'">'+ABW_LABELS[k]+'</option>').join('');
+  typSel.value = (info.typ==='urlaub' || info.typ==='krankenstand') ? info.typ : '';
+
+  const shiftSel = document.getElementById('dayModalShift');
+  shiftSel.innerHTML = '<option value="">– keine –</option>'
+    + state.shifts.map(sh=>'<option value="'+sh.id+'">'+escapeHtml(sh.name)+(sh.kuerzel?' ('+escapeHtml(sh.kuerzel)+')':'')+'</option>').join('');
+  shiftSel.value = info.shiftId || '';
+
+  document.getElementById('dayModalBs').innerHTML = BEREITSCHAFT_TYPES.map(bt=>
+    '<button type="button" class="bs-pill-modal'+(info.bereitschaft.includes(bt.code)?' active':'')
+    +'" data-code="'+bt.code+'" title="'+bt.code+': '+bt.start+'–'+bt.end+'">'+bt.code+'</button>'
+  ).join('');
+
+  syncDayModalShiftState();
+  document.getElementById('dayModal').classList.remove('hidden');
+}
+/* Bei Urlaub gibt es keine Schicht - Auswahl entsprechend sperren. */
+function syncDayModalShiftState(){
+  document.getElementById('dayModalShift').disabled =
+    document.getElementById('dayModalTyp').value === 'urlaub';
+}
+function closeDayModal(){
+  dayModalDate = null;
+  document.getElementById('dayModal').classList.add('hidden');
+}
+function saveDayModal(){
+  if(!dayModalDate) return;
+  const entry = ensureDay(dayModalDate);
+  const typ = document.getElementById('dayModalTyp').value;
+  entry.shiftId = (typ==='urlaub') ? '' : document.getElementById('dayModalShift').value;
+  entry.typ = typ ? typ : (entry.shiftId ? 'arbeit' : 'frei');
+  entry.bereitschaft = [...document.querySelectorAll('#dayModalBs .bs-pill-modal.active')].map(b=>b.dataset.code);
+  closeDayModal();
+  scheduleSave(); renderKalender(); renderDashboard();
+  showToast('Tag gespeichert');
+}
+
+/* ---------- Dienstplan aus Text ---------- */
+/* Zerlegt einen abgetippten Plan in [{tag, tokens}]. Ein neuer Tag beginnt bei
+   einer Zahl (mit oder ohne Punkt), alles danach gehoert zu diesem Tag.
+   "02.09." wird als Tag 2 gelesen, der Monat kommt aus dem Auswahlfeld. */
+function parsePlanText(text){
+  const teile = String(text||'')
+    .replace(/[()\[\]{}]/g,' ')
+    .replace(/[,;|]/g,' ')
+    .split(/\s+/).filter(Boolean);
+  const eintraege = [];
+  let aktuell = null;
+  const neuerTag = nr => { aktuell = {tag:nr, tokens:[]}; eintraege.push(aktuell); };
+  teile.forEach(tok=>{
+    let m = tok.match(/^(\d{1,2})\.(\d{1,2})\.?$/);   // 02.09.
+    if(m){ neuerTag(Number(m[1])); return; }
+    m = tok.match(/^(\d{1,2})\.?$/);                   // 2 oder 2.
+    if(m){ neuerTag(Number(m[1])); return; }
+    m = tok.match(/^(\d{1,2})\.(.+)$/);                // 2.EL ohne Leerzeichen
+    if(m){ neuerTag(Number(m[1])); aktuell.tokens.push(m[2]); return; }
+    if(aktuell) aktuell.tokens.push(tok);
+  });
+  return eintraege;
+}
+/* Uebersetzt die Kuerzel eines Tages in Schicht, Typ und Bereitschaften. */
+const PLAN_FREI = ['FREI','LEER','-','–','—','X','/','.'];
+const PLAN_URLAUB = ['U','UR','URLAUB'];
+const PLAN_KRANK = ['K','KS','KRANK','KRANKENSTAND'];
+function resolvePlanTokens(tokens){
+  const res = {shiftId:'', typ:'frei', bereitschaft:[], unbekannt:[], erkannt:false};
+  tokens.forEach(raw=>{
+    const t = String(raw).trim();
+    if(!t) return;
+    const up = t.toUpperCase();
+    const bt = BEREITSCHAFT_TYPES.find(b=>b.code===up);
+    if(bt){
+      if(!res.bereitschaft.includes(bt.code)) res.bereitschaft.push(bt.code);
+      res.erkannt = true; return;
+    }
+    if(PLAN_FREI.includes(up)){ res.typ='frei'; res.shiftId=''; res.erkannt = true; return; }
+    if(PLAN_URLAUB.includes(up)){ res.typ='urlaub'; res.shiftId=''; res.erkannt = true; return; }
+    if(PLAN_KRANK.includes(up)){ res.typ='krankenstand'; res.erkannt = true; return; }
+    const shift = state.shifts.find(sh=>(sh.kuerzel||'').trim().toUpperCase()===up)
+      || state.shifts.find(sh=>sh.name.trim().toUpperCase()===up);
+    if(shift){ res.shiftId = shift.id; res.typ = 'arbeit'; res.erkannt = true; return; }
+    res.unbekannt.push(t);
+  });
+  if(res.shiftId && res.typ==='frei') res.typ = 'arbeit';
+  return res;
+}
+/* Baut aus Text und Monat die Liste der Aenderungen samt Hinweisen. */
+let planVorschau = [];
+function buildPlanVorschau(){
+  planVorschau = [];
+  const monatVal = document.getElementById('planMonat').value;
+  const schutz = document.getElementById('planSchutz').checked;
+  const box = document.getElementById('planPreview');
+  const applyBtn = document.getElementById('planApplyBtn');
+  applyBtn.disabled = true;
+  if(!monatVal){ box.innerHTML = '<p class="muted err" style="color:var(--red);">Bitte zuerst einen Monat wählen.</p>'; return; }
+  const [jahr, monat] = monatVal.split('-').map(Number);
+  const letzterTag = new Date(jahr, monat, 0).getDate();
+  const eintraege = parsePlanText(document.getElementById('planText').value);
+  if(eintraege.length===0){
+    box.innerHTML = '<p class="muted">Im Text wurde kein Tag erkannt. Erwartet wird z. B. „1. EL 2. leer 3. EL“.</p>';
+    return;
+  }
+  const zeilen = [];
+  const gesehen = {};
+  eintraege.forEach(e=>{
+    const dateStr = fmtDate(new Date(jahr, monat-1, e.tag));
+    const d = parseLocalDate(dateStr);
+    const label = pad(e.tag)+'. '+(e.tag>=1 && e.tag<=letzterTag ? WOCHENTAGE[d.getDay()] : '');
+    if(e.tag<1 || e.tag>letzterTag){
+      zeilen.push('<div class="plan-row"><span class="tag">'+pad(e.tag)+'.</span><span class="err">Tag gibt es in diesem Monat nicht – übersprungen</span></div>');
+      return;
+    }
+    const res = resolvePlanTokens(e.tokens);
+    const hinweise = [];
+    if(gesehen[dateStr]) hinweise.push('<span class="warn">Tag kommt mehrfach vor – dieser Eintrag gilt</span>');
+    gesehen[dateStr] = true;
+    if(!res.erkannt && res.unbekannt.length===0){
+      zeilen.push('<div class="plan-row"><span class="tag">'+label+'</span><span class="skip">nichts angegeben – übersprungen</span></div>');
+      return;
+    }
+    if(res.unbekannt.length) hinweise.push('<span class="warn">nicht erkannt: '+escapeHtml(res.unbekannt.join(' '))+'</span>');
+    const info = getDayInfo(dateStr);
+    const hatZeiten = info.segments.some(sg=>sg.kommen || sg.gehen);
+    if(schutz && hatZeiten){
+      zeilen.push('<div class="plan-row"><span class="tag">'+label+'</span><span class="skip">hat bereits erfasste Zeiten – übersprungen</span></div>');
+      return;
+    }
+    if(!res.erkannt){
+      zeilen.push('<div class="plan-row"><span class="tag">'+label+'</span>'+hinweise.join(' ')+' <span class="skip">– übersprungen</span></div>');
+      return;
+    }
+    const shift = state.shifts.find(sh=>sh.id===res.shiftId);
+    let was = res.typ==='urlaub' ? 'Urlaub'
+      : res.typ==='krankenstand' ? ('Krankenstand'+(shift?' ('+escapeHtml(shift.name)+')':''))
+      : shift ? escapeHtml(shift.name)+(shift.kuerzel?' ('+escapeHtml(shift.kuerzel)+')':'')
+      : 'frei';
+    if(res.bereitschaft.length) was += ' + '+res.bereitschaft.join(' ');
+    planVorschau.push({dateStr, res});
+    zeilen.push('<div class="plan-row"><span class="tag">'+label+'</span><span>'+was+'</span>'+(hinweise.length?' '+hinweise.join(' '):'')+'</div>');
+  });
+  box.innerHTML = '<p class="muted" style="margin-bottom:6px;">'+planVorschau.length+' von '+eintraege.length+' Tag(en) werden eingetragen:</p>'+zeilen.join('');
+  applyBtn.disabled = planVorschau.length===0;
+}
+function applyPlanVorschau(){
+  if(planVorschau.length===0) return;
+  planVorschau.forEach(({dateStr, res})=>{
+    const entry = ensureDay(dateStr);
+    entry.shiftId = res.shiftId;
+    entry.typ = res.typ;
+    entry.bereitschaft = res.bereitschaft.slice();
+  });
+  const anzahl = planVorschau.length;
+  planVorschau = [];
+  document.getElementById('planPreview').innerHTML = '<p class="muted">'+anzahl+' Tag(e) eingetragen.</p>';
+  document.getElementById('planApplyBtn').disabled = true;
+  scheduleSave(); renderMonth(); renderDashboard(); renderAbwesenheiten();
+  showToast(anzahl+' Tag(e) aus dem Plan übernommen');
+}
+
 /* ---------- Rendering: Abwesenheiten ---------- */
 function renderAbwesenheiten(){
   const now = new Date();
@@ -1474,6 +1853,7 @@ function switchTab(tab){
   document.querySelectorAll('.view').forEach(v=>v.classList.toggle('active', v.id==='view-'+tab));
   if(tab==='dashboard') renderDashboard();
   if(tab==='monat') renderMonth();
+  if(tab==='kalender') renderKalender();
   if(tab==='schichten') renderShifts();
   if(tab==='abwesenheiten') renderAbwesenheiten();
   if(tab==='einstellungen') renderSettingsForm();
@@ -1626,6 +2006,68 @@ function bindEvents(){
     if(row) row.scrollIntoView({block:'center', behavior:'smooth'});
   });
 
+  document.getElementById('calPrev').addEventListener('click', ()=>{
+    viewMonth--; if(viewMonth<0){viewMonth=11; viewYear--;}
+    renderKalender();
+  });
+  document.getElementById('calNext').addEventListener('click', ()=>{
+    viewMonth++; if(viewMonth>11){viewMonth=0; viewYear++;}
+    renderKalender();
+  });
+  document.getElementById('calToday').addEventListener('click', ()=>{
+    const n = new Date(); viewYear=n.getFullYear(); viewMonth=n.getMonth();
+    renderKalender();
+  });
+  document.getElementById('calMonthPick').addEventListener('change', e=>{
+    const [y,m] = (e.target.value||'').split('-').map(Number);
+    if(!y || !m) return;
+    viewYear = y; viewMonth = m-1;
+    renderKalender();
+  });
+  // Klick auf einen Tag oeffnet die Schnelleingabe
+  document.getElementById('calGrid').addEventListener('click', e=>{
+    const cell = e.target.closest('.cal-cell');
+    if(!cell || !cell.dataset.date) return;
+    openDayModal(cell.dataset.date);
+  });
+  document.getElementById('dayModalTyp').addEventListener('change', syncDayModalShiftState);
+  document.getElementById('dayModalBs').addEventListener('click', e=>{
+    const pill = e.target.closest('.bs-pill-modal');
+    if(pill) pill.classList.toggle('active');
+  });
+  document.getElementById('dayModalSave').addEventListener('click', saveDayModal);
+  document.getElementById('dayModalCancel').addEventListener('click', closeDayModal);
+  document.getElementById('dayModalClear').addEventListener('click', ()=>{
+    if(!dayModalDate) return;
+    if(!confirm('Alle Einträge dieses Tages löschen (Schicht, Zeiten, Bereitschaft, Bemerkung)?')) return;
+    delete state.days[dayModalDate];
+    closeDayModal();
+    scheduleSave(); renderKalender(); renderDashboard();
+    showToast('Tag geleert');
+  });
+  // Sprung in die Monatsansicht, wenn Kommen/Gehen erfasst werden soll
+  document.getElementById('dayModalOpenMonth').addEventListener('click', ()=>{
+    const dateStr = dayModalDate;
+    closeDayModal();
+    if(!dateStr) return;
+    const d = parseLocalDate(dateStr);
+    viewYear = d.getFullYear(); viewMonth = d.getMonth();
+    switchTab('monat');
+    const row = document.querySelector(`tr[data-date="${dateStr}"]`);
+    if(row){
+      row.scrollIntoView({block:'center', behavior:'smooth'});
+      row.classList.add('today');
+      setTimeout(()=>{ if(row.dataset.date!==todayStr()) row.classList.remove('today'); }, 2000);
+    }
+  });
+  // Klick auf den Hintergrund und Escape schliessen das Fenster
+  document.getElementById('dayModal').addEventListener('click', e=>{
+    if(e.target.id==='dayModal') closeDayModal();
+  });
+  document.addEventListener('keydown', e=>{
+    if(e.key==='Escape' && dayModalDate) closeDayModal();
+  });
+
   document.getElementById('addShiftBtn').addEventListener('click', ()=>{
     const name = document.getElementById('shiftName').value.trim();
     const kuerzel = document.getElementById('shiftKuerzel').value.trim();
@@ -1668,6 +2110,16 @@ function bindEvents(){
     scheduleSave(); renderMonth(); renderDashboard(); renderAbwesenheiten();
     document.getElementById('dpHint').textContent = count + ' Tag(e) aktualisiert.';
     showToast(count + ' Tag(e) aktualisiert');
+  });
+
+  document.getElementById('planPreviewBtn').addEventListener('click', buildPlanVorschau);
+  document.getElementById('planApplyBtn').addEventListener('click', applyPlanVorschau);
+  // Aenderungen an Text, Monat oder Schutzhaken machen die Vorschau ungueltig
+  ['planText','planMonat','planSchutz'].forEach(id=>{
+    document.getElementById(id).addEventListener('input', ()=>{
+      planVorschau = [];
+      document.getElementById('planApplyBtn').disabled = true;
+    });
   });
 
   document.getElementById('abwApplyBtn').addEventListener('click', ()=>{
@@ -1763,40 +2215,38 @@ function applyDarkMode(){
 }
 
 /* ---------- Auth ---------- */
-let authMode = 'login'; // 'login' | 'register'
 let appStarted = false;
 
-function setAuthMode(mode){
-  authMode = mode;
-  document.getElementById('authTitle').textContent = mode==='login' ? 'Anmelden' : 'Konto erstellen';
-  document.getElementById('authSubmitBtn').textContent = mode==='login' ? 'Anmelden' : 'Registrieren';
-  document.getElementById('authSwitchMode').innerHTML = mode==='login'
-    ? 'Noch kein Konto? <a id="authSwitchLink">Registrieren</a>'
-    : 'Bereits ein Konto? <a id="authSwitchLink">Anmelden</a>';
-  document.getElementById('authError').textContent = '';
-  document.getElementById('authSwitchLink').addEventListener('click', ()=> setAuthMode(mode==='login' ? 'register' : 'login'));
-}
+/* Anmeldung laeuft ueber ein Formular, damit Enter im E-Mail- oder
+   Passwortfeld direkt absendet. Eine Registrierung gibt es bewusst nicht -
+   das Konto wird im Supabase-Projekt angelegt. */
 function bindAuthEvents(){
-  setAuthMode('login');
-  document.getElementById('authSubmitBtn').addEventListener('click', async ()=>{
+  const form = document.getElementById('authForm');
+  const submitBtn = document.getElementById('authSubmitBtn');
+  // Enter in einem der beiden Felder meldet an. Das Formular wuerde das zwar
+  // von sich aus tun, manche mobilen Tastaturen loesen aber kein Absenden aus.
+  ['authEmail','authPassword'].forEach(id=>{
+    document.getElementById(id).addEventListener('keydown', e=>{
+      if(e.key==='Enter'){ e.preventDefault(); form.requestSubmit(); }
+    });
+  });
+  form.addEventListener('submit', async e=>{
+    e.preventDefault();
     const email = document.getElementById('authEmail').value.trim();
     const password = document.getElementById('authPassword').value;
     const errorEl = document.getElementById('authError');
     errorEl.textContent = '';
     if(!email || !password){ errorEl.textContent = 'Bitte E-Mail und Passwort eingeben.'; return; }
+    submitBtn.disabled = true;
+    submitBtn.textContent = 'Anmelden …';
     try{
-      if(authMode==='login'){
-        const {error} = await sb.auth.signInWithPassword({email, password});
-        if(error) throw error;
-      }else{
-        const {error} = await sb.auth.signUp({email, password});
-        if(error) throw error;
-        errorEl.style.color = 'var(--green)';
-        errorEl.textContent = 'Konto erstellt. Falls Bestätigung per E-Mail aktiviert ist, prüfe dein Postfach und melde dich danach an.';
-        errorEl.style.color = '';
-      }
-    }catch(e){
-      errorEl.textContent = e.message || 'Anmeldung fehlgeschlagen.';
+      const {error} = await sb.auth.signInWithPassword({email, password});
+      if(error) throw error;
+    }catch(err){
+      errorEl.textContent = err.message || 'Anmeldung fehlgeschlagen.';
+    }finally{
+      submitBtn.disabled = false;
+      submitBtn.textContent = 'Anmelden';
     }
   });
 }
@@ -1826,6 +2276,7 @@ async function startApp(){
   renderAbwesenheiten();
   renderSettingsForm();
   document.getElementById('icalMonth').value = now.getFullYear()+'-'+pad(now.getMonth()+1);
+  document.getElementById('planMonat').value = now.getFullYear()+'-'+pad(now.getMonth()+1);
 }
 async function init(){
   if(!sb){
