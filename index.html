@@ -146,6 +146,9 @@
   td.saldo{font-weight:700; font-variant-numeric:tabular-nums;}
   td.ist{font-variant-numeric:tabular-nums;}
   .soll-inline{display:block; color:var(--text-dim); font-size:0.72em; font-weight:500; margin-top:2px;}
+  /* Vorausberechnete Ist-Zeit: Schichtzeit statt noch fehlender Stempeldaten */
+  .ist-geplant{color:var(--accent); font-style:italic;}
+  .ist-geplant + .soll-inline{color:var(--accent);}
   input.zeitzugangInput{width:76px; min-width:76px; text-align:center;}
 
   .form-grid{display:grid; grid-template-columns:repeat(auto-fit,minmax(150px,1fr)); gap:12px;}
@@ -351,6 +354,7 @@
       <span><span class="swatch" style="background:var(--amber-bg)"></span>Feiertag</span>
       <span><span class="swatch" style="outline:2px solid var(--accent)"></span>Heute</span>
       <span><span class="swatch" style="box-shadow:inset 3px 0 0 var(--accent);border:1px solid var(--border)"></span>Nächster offener Nachtrag</span>
+      <span><i style="color:var(--accent); font-style:italic; font-weight:600;">8:00</i> geplante Schichtzeit, noch nicht gestempelt</span>
     </div>
     <div class="table-wrap">
       <table>
@@ -1435,6 +1439,15 @@ function renderMonth(){
       </label>`;
     const zeitenCell = `<div class="zeiten-cell">${segsHtml}${rundungHint}${rundungRow}</div>`;
 
+    /* Solange für einen geplanten Dienst keine Stempelzeiten da sind, zeigt die
+       Ist-Spalte die geplante Schichtzeit - farblich abgesetzt, damit klar ist,
+       dass es ein Vorausblick und kein erfasster Wert ist. Gerechnet wird
+       weiterhin nur mit den tatsächlich erfassten Zeiten. */
+    const istGeplant = needsStamping(dateStr);
+    const istCellHtml = istGeplant
+      ? `<span class="ist-geplant" title="Noch keine Stempelzeiten erfasst – angezeigt wird die geplante Schichtzeit">${fmtHM(info.planzeitMinutes + info.ist)}</span><span class="soll-inline">geplant · Soll ${fmtHM(info.soll)}</span>`
+      : `${fmtHM(info.ist)}<span class="soll-inline">Soll ${fmtHM(info.soll)}</span>`;
+
     const kontostandLaufend = getBalanceUpTo(dateStr);
 
     return `<tr class="${rowClasses.join(' ')}" data-date="${dateStr}">
@@ -1445,7 +1458,7 @@ function renderMonth(){
       <td>${bereitschaftCell}</td>
       <td>${zeitenCell}</td>
       <td><input type="text" inputmode="numeric" class="zeitzugangInput time-field" data-date="${dateStr}" value="${info.zeitzugang}" placeholder="hh:mm"></td>
-      <td class="ist">${fmtHM(info.ist)}<span class="soll-inline">Soll ${fmtHM(info.soll)}</span></td>
+      <td class="ist">${istCellHtml}</td>
       <td class="saldo ${info.saldo>0?'pos':(info.saldo<0?'neg':'neutral')}">${fmtHMSigned(info.saldo)}</td>
       <td class="saldo ${kontostandLaufend>0?'pos':(kontostandLaufend<0?'neg':'neutral')}">${fmtHM(kontostandLaufend)}</td>
       <td class="remark"><input type="text" data-date="${dateStr}" class="bemerkungInput" value="${escapeHtml(info.bemerkung)}" placeholder="…"></td>
