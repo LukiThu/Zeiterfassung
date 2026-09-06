@@ -149,6 +149,7 @@
   /* Vorausberechnete Ist-Zeit: Schichtzeit statt noch fehlender Stempeldaten */
   .ist-geplant{color:var(--accent); font-style:italic;}
   .ist-geplant + .soll-inline{color:var(--accent);}
+  td.saldo.geplant{color:var(--accent); font-style:italic;}
   input.zeitzugangInput{width:76px; min-width:76px; text-align:center;}
 
   .form-grid{display:grid; grid-template-columns:repeat(auto-fit,minmax(150px,1fr)); gap:12px;}
@@ -380,7 +381,7 @@
             <td colspan="7">Prognose Monatsende <span class="muted" style="font-weight:500; text-transform:none; letter-spacing:0;">(Stempeldaten wo vorhanden, sonst Planwert)</span></td>
             <td id="footIstProjected">–</td>
             <td id="footSaldoProjected">–</td>
-            <td></td>
+            <td id="footKontostandProjected">–</td>
             <td></td>
           </tr>
         </tfoot>
@@ -1375,6 +1376,9 @@ function renderMonth(){
     jumpBtn.style.display = 'none';
   }
 
+  /* Summiert die noch nicht gestempelte Planzeit des Monats mit, damit Saldo
+     und Kontostand ab dem ersten offenen Tag die Vorausberechnung zeigen. */
+  let prognoseDelta = 0;
   tbody.innerHTML = dates.map(dateStr=>{
     const info = getDayInfo(dateStr);
     const rowClasses = [];
@@ -1444,11 +1448,16 @@ function renderMonth(){
        dass es ein Vorausblick und kein erfasster Wert ist. Gerechnet wird
        weiterhin nur mit den tatsächlich erfassten Zeiten. */
     const istGeplant = needsStamping(dateStr);
+    const istAnzeige = istGeplant ? info.planzeitMinutes + info.ist : info.ist;
     const istCellHtml = istGeplant
-      ? `<span class="ist-geplant" title="Noch keine Stempelzeiten erfasst – angezeigt wird die geplante Schichtzeit">${fmtHM(info.planzeitMinutes + info.ist)}</span><span class="soll-inline">geplant · Soll ${fmtHM(info.soll)}</span>`
+      ? `<span class="ist-geplant" title="Noch keine Stempelzeiten erfasst – angezeigt wird die geplante Schichtzeit">${fmtHM(istAnzeige)}</span><span class="soll-inline">geplant · Soll ${fmtHM(info.soll)}</span>`
       : `${fmtHM(info.ist)}<span class="soll-inline">Soll ${fmtHM(info.soll)}</span>`;
 
-    const kontostandLaufend = getBalanceUpTo(dateStr);
+    const saldoAnzeige = istAnzeige - info.soll;
+    if(istGeplant) prognoseDelta += info.planzeitMinutes;
+    // Ab dem ersten offenen Tag enthält der Kontostand Planwerte
+    const kontostandLaufend = getBalanceUpTo(dateStr) + prognoseDelta;
+    const kontostandGeplant = prognoseDelta !== 0;
 
     return `<tr class="${rowClasses.join(' ')}" data-date="${dateStr}">
       <td class="daycol">${pad(d.getDate())}.${pad(d.getMonth()+1)}.<div class="wd">${WOCHENTAGE[d.getDay()]}</div></td>
@@ -1459,8 +1468,8 @@ function renderMonth(){
       <td>${zeitenCell}</td>
       <td><input type="text" inputmode="numeric" class="zeitzugangInput time-field" data-date="${dateStr}" value="${info.zeitzugang}" placeholder="hh:mm"></td>
       <td class="ist">${istCellHtml}</td>
-      <td class="saldo ${info.saldo>0?'pos':(info.saldo<0?'neg':'neutral')}">${fmtHMSigned(info.saldo)}</td>
-      <td class="saldo ${kontostandLaufend>0?'pos':(kontostandLaufend<0?'neg':'neutral')}">${fmtHM(kontostandLaufend)}</td>
+      <td class="saldo ${istGeplant ? 'geplant' : (saldoAnzeige>0?'pos':(saldoAnzeige<0?'neg':'neutral'))}">${fmtHMSigned(saldoAnzeige)}</td>
+      <td class="saldo ${kontostandGeplant ? 'geplant' : (kontostandLaufend>0?'pos':(kontostandLaufend<0?'neg':'neutral'))}">${fmtHM(kontostandLaufend)}</td>
       <td class="remark"><input type="text" data-date="${dateStr}" class="bemerkungInput" value="${escapeHtml(info.bemerkung)}" placeholder="…"></td>
     </tr>`;
   }).join('');
@@ -1481,6 +1490,10 @@ function renderMonth(){
   const footSaldoProjEl = document.getElementById('footSaldoProjected');
   footSaldoProjEl.textContent = fmtHMSigned(projected.saldo);
   footSaldoProjEl.className = projected.saldo>0?'pos':(projected.saldo<0?'neg':'');
+  const kontostandProj = kontostandEnde + prognoseDelta;
+  const footKontostandProjEl = document.getElementById('footKontostandProjected');
+  footKontostandProjEl.textContent = fmtHM(kontostandProj);
+  footKontostandProjEl.className = kontostandProj>0?'pos':(kontostandProj<0?'neg':'');
 
   attachMonthRowListeners();
 }
