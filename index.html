@@ -585,6 +585,9 @@
       <h3>Bereitschaft</h3>
       <p class="muted">Pro Tag lassen sich mehrere Bereitschaftstypen gleichzeitig markieren (ELB, BN, BT). Sie sind reine Zusatzinfo und fließen <b>nicht</b> in Soll, Ist oder Saldo ein – sie werden gezählt (Kacheln im Kalender, Jahresstatistik im Dashboard) und in den Kalender-Export übernommen.</p>
 
+      <h3>Urlaub</h3>
+      <p class="muted">Der Jahresanspruch steht in den Grundeinstellungen. Unter „Urlaubsübertrag und Zusatztage“ kommen je Jahr Tage dazu – etwa der Resturlaub aus dem Vorjahr oder zusätzlich gewährte Tage; negative Werte ziehen ab. Der Knopf „Rest aus Vorjahr berechnen“ ermittelt den offenen Urlaub des Vorjahres und trägt ihn zum Prüfen ins Feld ein, gespeichert wird er erst mit „Speichern“. Beim Resturlaub unterscheidet die App zwischen <b>genommen</b> (Urlaubstage bis heute) und <b>verplant</b> (künftige Urlaubstage).</p>
+
       <h3>Zeitzugang</h3>
       <p class="muted">Ein frei eingegebener Stundenwert (hh:mm), der zusätzlich zum Ist des Tages zählt – unabhängig vom Typ. Im Kalender werden Zeitzugänge getrennt ausgewiesen: „Ist gestempelt“ ohne, „Ist gesamt“ mit Zeitzugang.</p>
     </div>
@@ -637,6 +640,21 @@
         <div class="field" style="display:flex; align-items:flex-end;"><button class="btn" id="bgAddBtn">Speichern</button></div>
       </div>
       <div class="shift-list" id="bgList" style="margin-top:14px;"></div>
+    </div>
+
+    <hr class="sep">
+
+    <div class="card">
+      <h2>Urlaubsübertrag und Zusatztage</h2>
+      <p class="muted">Resturlaub aus dem Vorjahr oder zusätzlich gewährte Tage. Der Wert wird zum Jahresanspruch addiert, negative Werte ziehen ab. „Rest aus Vorjahr berechnen“ ermittelt den offenen Urlaub des Vorjahres und trägt ihn ins Feld ein – gespeichert wird erst mit „Speichern“, damit du den Wert vorher prüfen kannst.</p>
+      <div class="form-grid">
+        <div class="field"><label>Jahr</label><input type="number" id="uuJahr" step="1" min="1970" max="2999"></div>
+        <div class="field"><label>Tage</label><input type="number" id="uuTage" step="0.5" value="0"></div>
+        <div class="field" style="display:flex; align-items:flex-end;"><button class="btn" id="uuAddBtn">Speichern</button></div>
+        <div class="field" style="display:flex; align-items:flex-end;"><button class="btn secondary" id="uuVorjahrBtn">Rest aus Vorjahr berechnen</button></div>
+      </div>
+      <p class="muted" id="uuHint" style="margin-top:8px;"></p>
+      <div class="shift-list" id="uuList" style="margin-top:14px;"></div>
     </div>
 
     <hr class="sep">
@@ -780,6 +798,9 @@ const DEFAULT_STATE = {
      Monat, gilt automatisch 100 % (Vollzeit). Skaliert die Sollzeit pro
      Werktag in diesem Monat (z. B. 50 % bei sollstundenTag=8 -> 4 Std Soll/Tag). */
   beschaeftigungsgrad:{},
+  /* Urlaubsübertrag und Zusatztage je Jahr, Schlüssel "JJJJ". Wird zum
+     Jahresanspruch addiert (negative Werte ziehen ab). */
+  urlaubUebertrag:{},
   /* Die einzige Feiertagsliste - gesetzliche Vorgaben und eigene Einträge
      gleichberechtigt, alle bearbeitbar. Ein Eintrag:
      {id, name, sollStunden (Sollzeit bei 100 % Beschäftigungsgrad),
@@ -1350,7 +1371,8 @@ function renderDashboard(){
   const jahreskonto = sumSaldo(jahresStart > state.settings.startdatum ? jahresStart : state.settings.startdatum, todayStr());
 
   const urlaub = zaehleUrlaub(now.getFullYear());
-  const resturlaub = state.settings.urlaubsanspruch - urlaub.genommen - urlaub.verplant;
+  const urlaubUebertrag = getUrlaubUebertrag(now.getFullYear());
+  const resturlaub = getUrlaubsanspruch(now.getFullYear()) - urlaub.genommen - urlaub.verplant;
 
   const cls = v => v>0.001 ? 'pos' : (v<-0.001 ? 'neg' : 'neutral');
 
@@ -1365,8 +1387,9 @@ function renderDashboard(){
     {label:'Monat Saldo', value: fmtHMSigned(monatBisHeute.saldo), sub:'Ist − Soll, bis heute', cls: cls(monatBisHeute.saldo)},
     {label:'Jahreskonto', value: fmtHMSigned(jahreskonto), sub: now.getFullYear()+'', cls: cls(jahreskonto)},
     {label:'Überstunden', value: fmtHM(kontostand), sub:'= aktueller Kontostand inkl. Startsaldo', cls: cls(kontostand)},
-    {label:'Resturlaub', value: resturlaub+' Tage',
-     sub: urlaub.genommen+' genommen · '+urlaub.verplant+' verplant · von '+state.settings.urlaubsanspruch, cls:'neutral'},
+    {label:'Resturlaub', value: fmtTage(resturlaub)+' Tage',
+     sub: urlaub.genommen+' genommen · '+urlaub.verplant+' verplant · von '+fmtTage(getUrlaubsanspruch(now.getFullYear()))
+          + (urlaubUebertrag ? ' (inkl. '+fmtTage(urlaubUebertrag)+' Übertrag)' : ''), cls:'neutral'},
     {label:'Offene Stempel-Nachträge', value: openDates.length+' Tage', sub: nextOpen ? ('nächster: '+nextOpen) : 'alles nachgetragen', cls: openDates.length>0?'neg':'pos'}
   ];
   grid.innerHTML = items.map(it=>`
@@ -1443,6 +1466,26 @@ function renderKontoVerlauf(){
     'Kontostand am Monatsende, ' + erster.label + ' ' + erster.jahr + ' bis heute: '
     + '<b>' + fmtHM(erster.wert) + '</b> → <b>' + fmtHM(letzter.wert) + '</b> · Veränderung '
     + '<b class="' + (diff>0?'pos':(diff<0?'neg':'')) + '">' + fmtHMSigned(diff) + '</b>';
+}
+
+/* Übertrag bzw. Zusatztage eines Jahres. */
+function getUrlaubUebertrag(year){
+  const v = (state.urlaubUebertrag||{})[String(year)];
+  const n = Number(v);
+  return isNaN(n) ? 0 : n;
+}
+/* Gesamtanspruch eines Jahres: Grundanspruch plus Übertrag. */
+function getUrlaubsanspruch(year){
+  return (Number(state.settings.urlaubsanspruch)||0) + getUrlaubUebertrag(year);
+}
+/* Wie viele Tage am Jahresende übrig bleiben - Grundlage für den Übertrag. */
+function getUrlaubsrest(year){
+  const u = zaehleUrlaub(year);
+  return getUrlaubsanspruch(year) - u.genommen - u.verplant;
+}
+/* Tageszahl ohne unnötige Nachkommastelle: 20 statt 20.0, 20,5 bleibt. */
+function fmtTage(n){
+  return String(Math.round(n*100)/100).replace('.', ',');
 }
 
 /* Urlaubstage eines Jahres, getrennt nach bereits genommen und noch geplant -
@@ -2234,10 +2277,11 @@ function renderAbwesenheiten(){
   }).length;
 
   const urlaub = zaehleUrlaub(now.getFullYear());
-  const resturlaub = state.settings.urlaubsanspruch - urlaub.genommen - urlaub.verplant;
+  const uebertrag = getUrlaubUebertrag(now.getFullYear());
+  const resturlaub = getUrlaubsanspruch(now.getFullYear()) - urlaub.genommen - urlaub.verplant;
   const summary = document.getElementById('abwSummary');
   summary.innerHTML = `
-    <div class="card stat"><div class="label">Urlaub</div><div class="value neutral">${urlaub.genommen} Tg</div><div class="sub">genommen · ${urlaub.verplant} verplant · ${resturlaub} offen</div></div>
+    <div class="card stat"><div class="label">Urlaub</div><div class="value neutral">${urlaub.genommen} Tg</div><div class="sub">genommen · ${urlaub.verplant} verplant · ${fmtTage(resturlaub)} offen${uebertrag ? ' · inkl. '+fmtTage(uebertrag)+' Übertrag' : ''}</div></div>
     <div class="card stat"><div class="label">Krankenstand</div><div class="value neutral">${counts.krankenstand} Tg</div></div>
     <div class="card stat"><div class="label">Feiertage (Werktage)</div><div class="value neutral">${counts.feiertag} Tg</div><div class="sub">${now.getFullYear()}</div></div>
   `;
@@ -2263,7 +2307,39 @@ function renderSettingsForm(){
   document.getElementById('setSollstunden').value = state.settings.sollstundenTag;
   document.getElementById('setUrlaubsanspruch').value = state.settings.urlaubsanspruch;
   renderBeschaeftigungsgrad();
+  renderUrlaubUebertrag();
   renderCustomHolidays();
+}
+function renderUrlaubUebertrag(){
+  const jahrEl = document.getElementById('uuJahr');
+  if(!jahrEl.value) jahrEl.value = new Date().getFullYear();
+  const list = document.getElementById('uuList');
+  const entries = Object.entries(state.urlaubUebertrag||{}).sort((a,b)=>a[0]<b[0]?1:-1);
+  if(entries.length===0){
+    list.innerHTML = '<p class="muted">Kein Übertrag eingetragen – es gilt überall der Jahresanspruch aus den Grundeinstellungen.</p>';
+    return;
+  }
+  list.innerHTML = entries.map(([jahr, tage])=>{
+    const n = Number(tage)||0;
+    const genutzt = zaehleUrlaub(Number(jahr));
+    const gesamt = getUrlaubsanspruch(Number(jahr));
+    return `
+    <div class="shift-row" data-jahr="${jahr}">
+      <div class="name">${jahr}</div>
+      <div class="time">${n>0?'+':''}${fmtTage(n)} Tage</div>
+      <div class="time">Anspruch gesamt ${fmtTage(gesamt)} · offen ${fmtTage(gesamt - genutzt.genommen - genutzt.verplant)}</div>
+      <div class="spacer"></div>
+      <button class="btn danger small uuDeleteBtn">Löschen</button>
+    </div>`;
+  }).join('');
+  list.querySelectorAll('.uuDeleteBtn').forEach(btn=>{
+    btn.addEventListener('click', e=>{
+      const jahr = e.target.closest('.shift-row').dataset.jahr;
+      delete state.urlaubUebertrag[jahr];
+      scheduleSave(); renderUrlaubUebertrag(); renderDashboard(); renderAbwesenheiten();
+      showToast('Übertrag gelöscht');
+    });
+  });
 }
 function renderCustomHolidays(){
   const list = document.getElementById('chList');
@@ -2810,6 +2886,31 @@ function bindEvents(){
     if(neu===0){ showToast('Alle gesetzlichen Feiertage sind bereits in der Liste'); return; }
     scheduleSave(); renderCustomHolidays(); renderMonth(); renderDashboard(); renderAbwesenheiten(); renderKalender();
     showToast(neu+' gesetzliche(r) Feiertag(e) ergänzt');
+  });
+
+  document.getElementById('uuAddBtn').addEventListener('click', ()=>{
+    const jahr = parseInt(document.getElementById('uuJahr').value, 10);
+    const tage = parseFloat(document.getElementById('uuTage').value);
+    if(!jahr || jahr<1970 || jahr>2999){ showToast('Bitte ein gültiges Jahr angeben'); return; }
+    if(isNaN(tage)){ showToast('Bitte eine Tageszahl angeben'); return; }
+    if(!state.urlaubUebertrag) state.urlaubUebertrag = {};
+    if(tage===0){ delete state.urlaubUebertrag[String(jahr)]; }
+    else{ state.urlaubUebertrag[String(jahr)] = tage; }
+    document.getElementById('uuHint').textContent = '';
+    scheduleSave(); renderUrlaubUebertrag(); renderDashboard(); renderAbwesenheiten();
+    showToast('Übertrag gespeichert');
+  });
+  document.getElementById('uuVorjahrBtn').addEventListener('click', ()=>{
+    const jahr = parseInt(document.getElementById('uuJahr').value, 10);
+    if(!jahr || jahr<1970 || jahr>2999){ showToast('Bitte ein gültiges Jahr angeben'); return; }
+    const vorjahr = jahr-1;
+    const u = zaehleUrlaub(vorjahr);
+    const rest = getUrlaubsrest(vorjahr);
+    document.getElementById('uuTage').value = rest;
+    document.getElementById('uuHint').textContent =
+      'Rest ' + vorjahr + ': ' + fmtTage(rest) + ' Tage (Anspruch ' + fmtTage(getUrlaubsanspruch(vorjahr))
+      + ' inkl. ' + fmtTage(getUrlaubUebertrag(vorjahr)) + ' Übertrag, davon ' + (u.genommen+u.verplant)
+      + ' verbraucht). Mit „Speichern“ als Übertrag für ' + jahr + ' übernehmen.';
   });
 
   document.getElementById('suSuchenBtn').addEventListener('click', sucheAusfuehren);
