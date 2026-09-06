@@ -1034,11 +1034,16 @@ function getBalanceUpTo(dateStr){
    Startdatum, bis einschließlich heute) mit geplanter Schicht laut
    Dienstplan, der noch keine Kommen/Gehen-Zeiten hat. So weiß man beim
    nächsten Öffnen sofort, wo man weitermachen muss. */
-function needsStamping(dateStr){
-  const info = getDayInfo(dateStr);
+/* Ein Tag mit geplanter Schicht, für den noch kein vollständiges Zeitpaar
+   erfasst ist. Arbeitet auf einem bereits geholten Tagesobjekt, damit
+   Aufrufer getDayInfo nicht ein zweites Mal brauchen. */
+function isOpenShiftDay(info){
   if(!info.shiftId) return false;
   if(['urlaub','krankenstand'].includes(info.typ)) return false;
   return !info.segments.some(s=>s.kommen && s.gehen);
+}
+function needsStamping(dateStr){
+  return isOpenShiftDay(getDayInfo(dateStr));
 }
 function findNextOpenDate(){
   const start = state.settings.startdatum;
@@ -1096,7 +1101,7 @@ function getMonthProjectedStats(year, monthIdx){
   dates.forEach(d=>{
     const info = getDayInfo(d);
     soll += info.soll;
-    ist += needsStamping(d) ? (info.planzeitMinutes + info.ist) : info.ist;
+    ist += isOpenShiftDay(info) ? (info.planzeitMinutes + info.ist) : info.ist;
   });
   return {soll, ist, saldo: ist-soll};
 }
@@ -1127,10 +1132,29 @@ function saveStateToLocalStorage(){
 async function loadState(){
   if(sb && currentUser){
     try{
-      const {data, error} = await sb.from('zeiterfassung_state').select('data').eq('user_id', currentUser.id).maybeSingle();
+      const {data, error} = await sb.from('zeiterfassung_state')
+        .select('data, updated_at').eq('user_id', currentUser.id).maybeSingle();
       if(error) throw error;
       if(data && data.data){
+        const serverStempel = data.updated_at || (data.data.updatedAt || '');
+        /* Konnte die letzte Änderung vor dem Schließen nicht mehr hochgeladen
+           werden, ist die lokale Kopie neuer - dann gilt sie und wandert
+           anschließend auf den Server. */
+        let lokal = null;
+        try{
+          const raw = window.localStorage.getItem(STORAGE_KEY);
+          if(raw) lokal = JSON.parse(raw);
+        }catch(e){ /* kein lokaler Stand vorhanden */ }
+        const lokalStempel = (lokal && lokal.updatedAt) ? lokal.updatedAt : '';
+        if(lokalStempel && serverStempel && lokalStempel > serverStempel){
+          applyLoadedState(lokal);
+          if(!state.shifts || state.shifts.length===0) state.shifts = defaultShifts();
+          await saveState();
+          showToast('Lokal gesicherte Änderungen wurden hochgeladen');
+          return;
+        }
         applyLoadedState(data.data);
+        lastKnownUpdatedAt = serverStempel || null;
         saveStateToLocalStorage(); // lokale Kopie als Offline-Cache aktualisieren
         if(!state.shifts || state.shifts.length===0) state.shifts = defaultShifts();
         return;
@@ -1157,20 +1181,66 @@ async function loadState(){
 }
 function scheduleSave(){
   clearTimeout(saveTimer);
-  saveTimer = setTimeout(saveState, 400);
+  saveTimer = setTimeout(()=>{ saveTimer = null; saveState(); }, 400);
 }
+/* Wird beim Schließen des Tabs oder beim Wegschalten der App aufgerufen: eine
+   noch wartende Änderung sofort schreiben, statt sie zu verlieren. */
+function flushSave(){
+  if(saveTimer){
+    clearTimeout(saveTimer);
+    saveTimer = null;
+    saveState();
+  }
+}
+/* Zeitstempel des zuletzt selbst geschriebenen oder geladenen Standes. Daran
+   erkennt die App, ob in der Zwischenzeit ein anderes Gerät gespeichert hat. */
+let lastKnownUpdatedAt = null;
+
 async function saveState(){
+  const stempel = new Date().toISOString();
+  state.updatedAt = stempel;
   saveStateToLocalStorage();
   if(sb && currentUser){
     try{
       const {error} = await sb.from('zeiterfassung_state').upsert({
-        user_id: currentUser.id, data: state, updated_at: new Date().toISOString()
+        user_id: currentUser.id, data: state, updated_at: stempel
       });
       if(error) throw error;
+      lastKnownUpdatedAt = stempel;
     }catch(e){
       console.warn('Speichern in Supabase fehlgeschlagen, lokal gesichert', e);
       showToast('Online-Speichern fehlgeschlagen – lokal gesichert');
     }
+  }
+}
+/* Holt den Stand vom Server und baut die Ansichten neu auf. */
+async function reloadFromServer(){
+  const {data, error} = await sb.from('zeiterfassung_state')
+    .select('data, updated_at').eq('user_id', currentUser.id).maybeSingle();
+  if(error || !data || !data.data) return false;
+  applyLoadedState(data.data);
+  lastKnownUpdatedAt = data.updated_at || (data.data.updatedAt || null);
+  saveStateToLocalStorage();
+  applyDarkMode();
+  renderDashboard(); renderMonth(); renderKalender(); renderShifts();
+  renderAbwesenheiten(); renderSettingsForm();
+  return true;
+}
+/* Beim Zurückkehren in den Tab prüfen, ob inzwischen ein anderes Gerät
+   gespeichert hat - sonst würde die eigene, ältere Fassung dessen Änderungen
+   beim nächsten Speichern überschreiben. */
+async function pruefeFremdeAenderung(){
+  if(!sb || !currentUser || !appStarted) return;
+  if(saveTimer) return; // eigene Änderung noch nicht geschrieben - die hat Vorrang
+  try{
+    const {data, error} = await sb.from('zeiterfassung_state')
+      .select('updated_at').eq('user_id', currentUser.id).maybeSingle();
+    if(error || !data || !data.updated_at) return;
+    if(lastKnownUpdatedAt && data.updated_at > lastKnownUpdatedAt){
+      if(await reloadFromServer()) showToast('Neuere Daten von einem anderen Gerät geladen');
+    }
+  }catch(e){
+    console.warn('Abgleich mit Supabase nicht möglich', e);
   }
 }
 
@@ -1379,6 +1449,11 @@ function renderMonth(){
   /* Summiert die noch nicht gestempelte Planzeit des Monats mit, damit Saldo
      und Kontostand ab dem ersten offenen Tag die Vorausberechnung zeigen. */
   let prognoseDelta = 0;
+  /* Der Kontostand wird einmal pro Monatsrendering fortlaufend summiert. Ihn
+     für jede Zeile erneut ab dem Startdatum aufzuaddieren, hat bei mehreren
+     Jahren Datenbestand fast eine Sekunde pro Tastendruck gekostet. */
+  const startdatum = state.settings.startdatum;
+  let kontostandLauf = uebertrag;
   tbody.innerHTML = dates.map(dateStr=>{
     const info = getDayInfo(dateStr);
     const rowClasses = [];
@@ -1447,7 +1522,7 @@ function renderMonth(){
        Ist-Spalte die geplante Schichtzeit - farblich abgesetzt, damit klar ist,
        dass es ein Vorausblick und kein erfasster Wert ist. Gerechnet wird
        weiterhin nur mit den tatsächlich erfassten Zeiten. */
-    const istGeplant = needsStamping(dateStr);
+    const istGeplant = isOpenShiftDay(info);
     const istAnzeige = istGeplant ? info.planzeitMinutes + info.ist : info.ist;
     const istCellHtml = istGeplant
       ? `<span class="ist-geplant" title="Noch keine Stempelzeiten erfasst – angezeigt wird die geplante Schichtzeit">${fmtHM(istAnzeige)}</span><span class="soll-inline">geplant · Soll ${fmtHM(info.soll)}</span>`
@@ -1455,8 +1530,10 @@ function renderMonth(){
 
     const saldoAnzeige = istAnzeige - info.soll;
     if(istGeplant) prognoseDelta += info.planzeitMinutes;
+    // Tage vor dem Startdatum zählen nicht mit, dort gilt der Startsaldo
+    if(dateStr >= startdatum) kontostandLauf += info.saldo;
     // Ab dem ersten offenen Tag enthält der Kontostand Planwerte
-    const kontostandLaufend = getBalanceUpTo(dateStr) + prognoseDelta;
+    const kontostandLaufend = kontostandLauf + prognoseDelta;
     const kontostandGeplant = prognoseDelta !== 0;
 
     return `<tr class="${rowClasses.join(' ')}" data-date="${dateStr}">
@@ -1480,7 +1557,7 @@ function renderMonth(){
   footSaldoEl.textContent = fmtHMSigned(stats.saldo);
   footSaldoEl.className = stats.saldo>0?'pos':(stats.saldo<0?'neg':'');
   document.getElementById('footPlanzeit').textContent = fmtHM(stats.planzeit);
-  const kontostandEnde = getBalanceUpTo(dates[dates.length-1]);
+  const kontostandEnde = kontostandLauf;
   const footKontostandEl = document.getElementById('footKontostand');
   footKontostandEl.textContent = fmtHM(kontostandEnde);
   footKontostandEl.className = kontostandEnde>0?'pos':(kontostandEnde<0?'neg':'');
@@ -2174,14 +2251,16 @@ function exportIcal(){
     if(hatDienst){
       // Dienst-Termin: Bereitschaften haengen hinten am Titel ("L EL elb")
       const endDateStr = shift.isNight ? fmtDate(addDaysToDate(parseLocalDate(dateStr),1)) : dateStr;
-      lines.push('UID:'+dateStr+'-'+shift.id+'@zeiterfassung');
+      // UID nur aus dem Datum: ein erneuter Import aktualisiert den Termin,
+      // statt neben dem alten einen zweiten anzulegen
+      lines.push('UID:'+dateStr+'@zeiterfassung');
       lines.push('DTSTAMP:'+dtstamp);
       lines.push('DTSTART:'+icsDateTime(dateStr, shift.start));
       lines.push('DTEND:'+icsDateTime(endDateStr, shift.end));
       lines.push('SUMMARY:L '+icsEscape(shift.name)+(bereitschaft.length ? ' '+bereitschaft.join(' ') : ''));
     } else {
       // Nur Bereitschaft, kein Dienst: fester Zeitrahmen, im Titel nur die Kuerzel
-      lines.push('UID:'+dateStr+'-bereitschaft@zeiterfassung');
+      lines.push('UID:'+dateStr+'@zeiterfassung');
       lines.push('DTSTAMP:'+dtstamp);
       lines.push('DTSTART:'+icsDateTime(dateStr, ICAL_BEREITSCHAFT_START));
       lines.push('DTEND:'+icsDateTime(dateStr, ICAL_BEREITSCHAFT_END));
@@ -2439,6 +2518,14 @@ function bindEvents(){
     applyDarkMode();
     scheduleSave();
   });
+
+  // Beim Wegschalten sofort speichern, beim Zurückkommen auf fremde Änderungen prüfen
+  document.addEventListener('visibilitychange', ()=>{
+    if(document.visibilityState==='hidden') flushSave();
+    else pruefeFremdeAenderung();
+  });
+  window.addEventListener('pagehide', flushSave);
+  window.addEventListener('beforeunload', flushSave);
 
   document.getElementById('logoutBtn').addEventListener('click', async ()=>{
     if(sb) await sb.auth.signOut();
