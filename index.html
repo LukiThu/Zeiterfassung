@@ -954,7 +954,7 @@ function getDayInfo(dateStr){
   }
 
   let ist = 0;
-  let kommenCapped = false, kommenCappedTo = null;
+  let kommenCapped = false, kommenCappedTo = null, kommenCappedMinutes = 0;
   /* Pro Tag abschaltbar: dann zaehlt die tatsaechliche Stempelzeit, auch wenn
      mehr als KOMMEN_CAP_MINUTES vor Schichtbeginn eingestempelt wurde. */
   const rundungAus = !!entry.keineRundung;
@@ -972,7 +972,12 @@ function getDayInfo(dateStr){
           rundungGriffNicht = true;
           return acc + workedMinutes(seg.kommen, seg.gehen);
         }
-        if(cap.capped){ kommenCapped = true; kommenCappedTo = cap.effective; }
+        if(cap.capped){
+          kommenCapped = true;
+          kommenCappedTo = cap.effective;
+          // Differenz zwischen tatsaechlicher und angerechneter Stempelzeit
+          kommenCappedMinutes = timeToNum(cap.effective) - timeToNum(seg.kommen);
+        }
         return acc + workedMinutes(cap.effective, seg.gehen);
       }
       return acc + workedMinutes(seg.kommen, seg.gehen);
@@ -988,7 +993,7 @@ function getDayInfo(dateStr){
   return {
     dateStr, dow, isWeekend, holidayName, holidaySoll, holidayCustom: !!(holidayInfo && holidayInfo.custom),
     typ, soll, ist, saldo, planzeitMinutes,
-    shiftId: entry.shiftId || '', segments, kommenCapped, kommenCappedTo, zeitzugang, zeitzugangMinutes,
+    shiftId: entry.shiftId || '', segments, kommenCapped, kommenCappedTo, kommenCappedMinutes, zeitzugang, zeitzugangMinutes,
     keineRundung: rundungAus, rundungGriffNicht,
     bereitschaft: entry.bereitschaft || [],
     sollOverride: (entry.sollOverride!=null ? entry.sollOverride : ''),
@@ -1233,6 +1238,7 @@ function computeYearShiftStats(year){
   let krankenstandTage = 0;
   let nachtdienste = 0;
   let sonnFeiertagMinuten = 0;
+  let gekappteMinuten = 0, gekappteTage = 0;
   const bereitschaftCounts = {};
   BEREITSCHAFT_TYPES.forEach(bt=>{ bereitschaftCounts[bt.code] = 0; });
   const yearStart = fmtDate(new Date(year,0,1));
@@ -1249,14 +1255,15 @@ function computeYearShiftStats(year){
     }
     if(worked && shift && shift.isNight) nachtdienste++;
     if(info.dow===0 || info.holidayName){ sonnFeiertagMinuten += info.ist; }
+    if(info.kommenCappedMinutes > 0){ gekappteMinuten += info.kommenCappedMinutes; gekappteTage++; }
     info.bereitschaft.forEach(code=>{ if(bereitschaftCounts[code]!==undefined) bereitschaftCounts[code]++; });
   });
-  return {stats, krankenstandTage, bereitschaftCounts, nachtdienste, sonnFeiertagMinuten};
+  return {stats, krankenstandTage, bereitschaftCounts, nachtdienste, sonnFeiertagMinuten, gekappteMinuten, gekappteTage};
 }
 
 function renderYearStats(year){
   document.getElementById('statYearLabel').textContent = '(' + year + ', bis heute)';
-  const {stats, krankenstandTage, bereitschaftCounts, nachtdienste, sonnFeiertagMinuten} = computeYearShiftStats(year);
+  const {stats, krankenstandTage, bereitschaftCounts, nachtdienste, sonnFeiertagMinuten, gekappteMinuten, gekappteTage} = computeYearShiftStats(year);
 
   const body = document.getElementById('shiftStatsBody');
   if(state.shifts.length===0){
@@ -1300,6 +1307,8 @@ function renderYearStats(year){
     {label:'Krankenstandstage', value: krankenstandTage+' Tage', sub: year+''},
     {label:'Nachtdienstzulagen', value: nachtdienste+'', sub: 'Anzahl Nachtdienste, '+year},
     {label:'Sonn-/Feiertagsstunden', value: fmtHM(sonnFeiertagMinuten), sub: 'Ist-Stunden an Sonn- und Feiertagen, '+year},
+    {label:'Gekappte Zeit', value: fmtHM(gekappteMinuten),
+     sub: 'Durch die '+KOMMEN_CAP_MINUTES+'-Minuten-Rundung nicht angerechnet, an '+gekappteTage+' Tag(en) '+year},
     {label:'Verhältnis andere Schichten : SD', value: ratioValue, custom: ratioHtml, wide:true},
     {label:'Bereitschaften', value: bereitschaftValue, sub: 'Anzahl Tage je Typ, '+year, wide:true}
   ];
