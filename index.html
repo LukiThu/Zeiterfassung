@@ -305,6 +305,7 @@
   <button data-tab="schichten">Schichten</button>
   <button data-tab="abwesenheiten">Abwesenheiten</button>
   <button data-tab="einstellungen">Einstellungen &amp; Daten</button>
+  <button data-tab="suche">Suche</button>
   <button data-tab="infos">Infos</button>
 </nav>
 
@@ -317,12 +318,17 @@
         <div class="grid-dash" id="dashGrid"></div>
         <h3 style="margin-top:20px;">Jahresstatistik <span class="muted" id="statYearLabel" style="text-transform:none; letter-spacing:0; font-weight:500;"></span></h3>
         <div class="grid-dash" id="yearStatsGrid"></div>
+        <div class="card">
+          <h2>Verlauf des Zeitkontos</h2>
+          <p class="muted" id="verlaufInfo" style="margin-bottom:8px;"></p>
+          <div id="verlaufChart"></div>
+        </div>
       </div>
       <div class="dash-right card">
         <h2>Schichten im Jahr</h2>
         <div class="table-wrap dash-table-wrap" style="border:none; box-shadow:none;">
           <table style="min-width:0;">
-            <thead><tr><th>Schicht</th><th>Anzahl Tage</th><th>Gesamtzeit</th></tr></thead>
+            <thead><tr><th>Schicht</th><th>Anzahl Tage</th><th>Gesamtzeit</th><th>Ø gegen Plan</th><th>Ø Kommen–Gehen</th></tr></thead>
             <tbody id="shiftStatsBody"></tbody>
           </table>
         </div>
@@ -507,6 +513,58 @@
     </div>
   </section>
 
+
+  <!-- SUCHE -->
+  <section class="view" id="view-suche">
+    <div class="card">
+      <h2>Tage suchen und auswerten</h2>
+      <p class="muted">Zeitraum und Merkmale kombinieren – die Trefferliste zeigt die passenden Tage, darunter stehen die Summen.</p>
+      <div class="form-grid">
+        <div class="field"><label>Von</label><input type="date" id="suVon"></div>
+        <div class="field"><label>Bis</label><input type="date" id="suBis"></div>
+        <div class="field"><label>Schicht</label><select id="suSchicht"></select></div>
+        <div class="field">
+          <label>Typ</label>
+          <select id="suTyp">
+            <option value="">alle</option>
+            <option value="arbeit">Arbeit/Frei</option>
+            <option value="urlaub">Urlaub</option>
+            <option value="krankenstand">Krankenstand</option>
+            <option value="feiertag">Feiertag</option>
+          </select>
+        </div>
+        <div class="field">
+          <label>Bereitschaft</label>
+          <select id="suBereitschaft">
+            <option value="">alle</option>
+            <option value="__any">beliebige Bereitschaft</option>
+            <option value="ELB">ELB</option>
+            <option value="BN">BN</option>
+            <option value="BT">BT</option>
+          </select>
+        </div>
+        <div class="field">
+          <label>Wochentage</label>
+          <select id="suTage">
+            <option value="">alle</option>
+            <option value="werktag">nur Werktage</option>
+            <option value="wochenende">nur Wochenende</option>
+          </select>
+        </div>
+      </div>
+      <div class="row-gap" style="margin-top:12px;">
+        <button class="btn" id="suSuchenBtn">Suchen</button>
+        <button class="btn secondary" id="suCsvBtn" disabled>Treffer als CSV</button>
+      </div>
+      <div class="abw-summary" id="suSummary" style="margin-top:16px;"></div>
+      <div class="table-wrap" style="max-height:none; min-height:0;">
+        <table style="min-width:0;">
+          <thead><tr><th>Datum</th><th>Wt</th><th>Typ</th><th>Schicht</th><th>Bereitschaft</th><th>Zeiten</th><th>Ist</th><th>+/-</th></tr></thead>
+          <tbody id="suBody"><tr><td colspan="8" class="muted">Noch keine Suche gestartet.</td></tr></tbody>
+        </table>
+      </div>
+    </div>
+  </section>
 
   <!-- INFOS -->
   <section class="view" id="view-infos">
@@ -748,6 +806,22 @@ function fmtHM(mins){
   const abs = Math.round(Math.abs(mins));
   const h = Math.floor(abs/60), m = abs % 60;
   return sign + h + ':' + pad(m);
+}
+/* Minutenwert als Uhrzeit, z. B. 372 -> "06:12". */
+function fmtClock(mins){
+  const m = Math.round(mins);
+  return pad(Math.floor(m/60)%24)+':'+pad(m%60);
+}
+/* Kleine Differenz mit Vorzeichen, z. B. "+14 Min". */
+function fmtMinSigned(mins){
+  const m = Math.round(mins);
+  if(m===0) return '±0 Min';
+  return (m>0?'+':'−')+Math.abs(m)+' Min';
+}
+/* "2026-03-12" -> "12.03." */
+function kurzDatum(dateStr){
+  const d = parseLocalDate(dateStr);
+  return pad(d.getDate())+'.'+pad(d.getMonth()+1)+'.';
 }
 function fmtHMSigned(mins){
   const rounded = Math.round(mins);
@@ -1275,10 +1349,8 @@ function renderDashboard(){
   const jahresStart = fmtDate(new Date(now.getFullYear(),0,1));
   const jahreskonto = sumSaldo(jahresStart > state.settings.startdatum ? jahresStart : state.settings.startdatum, todayStr());
 
-  const urlaubJahr = Object.keys(state.days).filter(d=>{
-    return d.startsWith(String(now.getFullYear())) && state.days[d].typ === 'urlaub';
-  }).length;
-  const resturlaub = state.settings.urlaubsanspruch - urlaubJahr;
+  const urlaub = zaehleUrlaub(now.getFullYear());
+  const resturlaub = state.settings.urlaubsanspruch - urlaub.genommen - urlaub.verplant;
 
   const cls = v => v>0.001 ? 'pos' : (v<-0.001 ? 'neg' : 'neutral');
 
@@ -1293,7 +1365,8 @@ function renderDashboard(){
     {label:'Monat Saldo', value: fmtHMSigned(monatBisHeute.saldo), sub:'Ist − Soll, bis heute', cls: cls(monatBisHeute.saldo)},
     {label:'Jahreskonto', value: fmtHMSigned(jahreskonto), sub: now.getFullYear()+'', cls: cls(jahreskonto)},
     {label:'Überstunden', value: fmtHM(kontostand), sub:'= aktueller Kontostand inkl. Startsaldo', cls: cls(kontostand)},
-    {label:'Resturlaub', value: resturlaub+' Tage', sub: urlaubJahr+' von '+state.settings.urlaubsanspruch+' genommen', cls:'neutral'},
+    {label:'Resturlaub', value: resturlaub+' Tage',
+     sub: urlaub.genommen+' genommen · '+urlaub.verplant+' verplant · von '+state.settings.urlaubsanspruch, cls:'neutral'},
     {label:'Offene Stempel-Nachträge', value: openDates.length+' Tage', sub: nextOpen ? ('nächster: '+nextOpen) : 'alles nachgetragen', cls: openDates.length>0?'neg':'pos'}
   ];
   grid.innerHTML = items.map(it=>`
@@ -1305,15 +1378,100 @@ function renderDashboard(){
   `).join('');
 
   renderYearStats(now.getFullYear());
+  renderKontoVerlauf();
+}
+
+/* Kontostand am Ende der letzten zwölf Monate als kleine Kurve. Die Salden
+   werden in einem einzigen Durchlauf aufsummiert - ein getBalanceUpTo je Monat
+   würde bei mehreren Jahren Datenbestand spürbar bremsen. */
+function renderKontoVerlauf(){
+  const heute = todayStr();
+  const start = state.settings.startdatum;
+  const jetzt = new Date();
+  const punkte = [];
+  for(let i=11; i>=0; i--){
+    const d = new Date(jetzt.getFullYear(), jetzt.getMonth()-i, 1);
+    const letzter = fmtDate(new Date(d.getFullYear(), d.getMonth()+1, 0));
+    punkte.push({
+      label: MONATE[d.getMonth()].slice(0,3),
+      jahr: d.getFullYear(),
+      stichtag: letzter > heute ? heute : letzter,
+      wert: state.settings.startsaldo*60
+    });
+  }
+  const ende = punkte[punkte.length-1].stichtag;
+  if(start <= ende){
+    let lauf = state.settings.startsaldo*60;
+    const werte = {};
+    dateRange(start, ende).forEach(d=>{ lauf += getDayInfo(d).saldo; werte[d] = lauf; });
+    punkte.forEach(p=>{
+      if(p.stichtag < start) return;                 // vor dem Startdatum gilt der Startsaldo
+      p.wert = werte[p.stichtag] != null ? werte[p.stichtag] : lauf;
+    });
+  }
+
+  const w = 640, h = 150, padL = 46, padR = 10, padT = 12, padB = 24;
+  const werteArr = punkte.map(p=>p.wert);
+  let min = Math.min(0, ...werteArr), max = Math.max(0, ...werteArr);
+  if(max===min) max = min + 60;
+  const x = i => padL + i*(w-padL-padR)/(punkte.length-1);
+  const y = v => padT + (max-v)*(h-padT-padB)/(max-min);
+  const linie = punkte.map((p,i)=>(i?'L':'M')+x(i).toFixed(1)+' '+y(p.wert).toFixed(1)).join(' ');
+  const flaeche = linie + ' L'+x(punkte.length-1).toFixed(1)+' '+y(0).toFixed(1)+' L'+x(0).toFixed(1)+' '+y(0).toFixed(1)+' Z';
+  const letzter = punkte[punkte.length-1];
+  const erster = punkte[0];
+  const diff = letzter.wert - erster.wert;
+
+  document.getElementById('verlaufChart').innerHTML = `
+    <svg viewBox="0 0 ${w} ${h}" style="width:100%; height:auto; overflow:visible;" role="img"
+         aria-label="Kontostand der letzten zwölf Monate">
+      <path d="${flaeche}" fill="var(--accent)" opacity="0.12"></path>
+      <line x1="${padL}" y1="${y(0).toFixed(1)}" x2="${w-padR}" y2="${y(0).toFixed(1)}"
+            stroke="var(--border)" stroke-width="1" stroke-dasharray="3 3"></line>
+      <path d="${linie}" fill="none" stroke="var(--accent)" stroke-width="2"
+            stroke-linejoin="round" stroke-linecap="round"></path>
+      ${punkte.map((p,i)=>`<circle cx="${x(i).toFixed(1)}" cy="${y(p.wert).toFixed(1)}" r="${i===punkte.length-1?3.5:2}"
+            fill="var(--accent)"><title>${p.label} ${p.jahr}: ${fmtHM(p.wert)}</title></circle>`).join('')}
+      <text x="${padL-6}" y="${(y(max)+3).toFixed(1)}" text-anchor="end" font-size="9" fill="var(--text-dim)">${fmtHM(max)}</text>
+      <text x="${padL-6}" y="${(y(min)+3).toFixed(1)}" text-anchor="end" font-size="9" fill="var(--text-dim)">${fmtHM(min)}</text>
+      ${(min<0 && max>0) ? `<text x="${padL-6}" y="${(y(0)+3).toFixed(1)}" text-anchor="end" font-size="9" fill="var(--text-dim)">0:00</text>` : ''}
+      ${punkte.map((p,i)=>`<text x="${x(i).toFixed(1)}" y="${h-6}" text-anchor="middle" font-size="9"
+            fill="var(--text-dim)">${p.label}</text>`).join('')}
+    </svg>`;
+
+  document.getElementById('verlaufInfo').innerHTML =
+    'Kontostand am Monatsende, ' + erster.label + ' ' + erster.jahr + ' bis heute: '
+    + '<b>' + fmtHM(erster.wert) + '</b> → <b>' + fmtHM(letzter.wert) + '</b> · Veränderung '
+    + '<b class="' + (diff>0?'pos':(diff<0?'neg':'')) + '">' + fmtHMSigned(diff) + '</b>';
+}
+
+/* Urlaubstage eines Jahres, getrennt nach bereits genommen und noch geplant -
+   sonst schrumpft der Resturlaub schon beim Eintragen des Sommerurlaubs. */
+function zaehleUrlaub(year){
+  const heute = todayStr();
+  const praefix = String(year);
+  let genommen = 0, verplant = 0;
+  Object.keys(state.days).forEach(d=>{
+    if(!d.startsWith(praefix)) return;
+    if(getDayInfo(d).typ !== 'urlaub') return;
+    if(d <= heute) genommen++; else verplant++;
+  });
+  return {genommen, verplant};
 }
 
 function computeYearShiftStats(year){
   const stats = {};
-  state.shifts.forEach(s=>{ stats[s.id] = {count:0, minutes:0}; });
+  state.shifts.forEach(s=>{
+    stats[s.id] = {count:0, minutes:0, diffPlan:0, diffCount:0, kommenSum:0, gehenSum:0, zeitCount:0};
+  });
   let krankenstandTage = 0;
   let nachtdienste = 0;
   let sonnFeiertagMinuten = 0;
   let gekappteMinuten = 0, gekappteTage = 0;
+  // Wochenendbelastung und Dienstserien
+  let wochenendTage = 0, sonntage = 0, freieWochenenden = 0, wochenendenGesamt = 0;
+  let serie = 0, serieStart = null, serieMax = 0, serieMaxVon = null, serieMaxBis = null;
+  let samstagGearbeitet = false, samstagGesehen = false;
   const bereitschaftCounts = {};
   BEREITSCHAFT_TYPES.forEach(bt=>{ bereitschaftCounts[bt.code] = 0; });
   const yearStart = fmtDate(new Date(year,0,1));
@@ -1324,30 +1482,77 @@ function computeYearShiftStats(year){
     if(info.typ==='krankenstand') krankenstandTage++;
     const shift = state.shifts.find(s=>s.id===info.shiftId);
     const worked = WORK_LIKE_TYPES.includes(info.typ) || info.typ==='feiertag';
-    if(worked && info.shiftId && stats[info.shiftId]){
-      stats[info.shiftId].count++;
-      stats[info.shiftId].minutes += info.ist;
+    const dienst = worked && !!info.shiftId;
+    if(dienst && stats[info.shiftId]){
+      const st = stats[info.shiftId];
+      st.count++;
+      st.minutes += info.ist;
+      // Nur fertig gestempelte Tage taugen für den Vergleich mit der Planzeit
+      if(!isOpenShiftDay(info)){
+        st.diffPlan += info.ist - info.planzeitMinutes;
+        st.diffCount++;
+        const erstes = info.segments.find(sg=>sg.kommen);
+        const letztes = info.segments.slice().reverse().find(sg=>sg.gehen);
+        if(erstes && letztes){
+          st.kommenSum += timeToNum(erstes.kommen);
+          st.gehenSum += timeToNum(letztes.gehen);
+          st.zeitCount++;
+        }
+      }
+    }
+    // Dienstserie: aufeinanderfolgende Tage mit Dienst
+    if(dienst){
+      if(serie===0) serieStart = dateStr;
+      serie++;
+      if(serie > serieMax){ serieMax = serie; serieMaxVon = serieStart; serieMaxBis = dateStr; }
+    } else {
+      serie = 0;
+    }
+    // Wochenenden: Samstag merken, am Sonntag das Paar auswerten
+    if(info.dow===6){
+      samstagGesehen = true; samstagGearbeitet = dienst;
+      if(dienst) wochenendTage++;
+    } else if(info.dow===0){
+      if(dienst){ wochenendTage++; sonntage++; }
+      if(samstagGesehen){
+        wochenendenGesamt++;
+        if(!samstagGearbeitet && !dienst) freieWochenenden++;
+      }
+      samstagGesehen = false;
+    } else {
+      samstagGesehen = false;
     }
     if(worked && shift && shift.isNight) nachtdienste++;
     if(info.dow===0 || info.holidayName){ sonnFeiertagMinuten += info.ist; }
     if(info.kommenCappedMinutes > 0){ gekappteMinuten += info.kommenCappedMinutes; gekappteTage++; }
     info.bereitschaft.forEach(code=>{ if(bereitschaftCounts[code]!==undefined) bereitschaftCounts[code]++; });
   });
-  return {stats, krankenstandTage, bereitschaftCounts, nachtdienste, sonnFeiertagMinuten, gekappteMinuten, gekappteTage};
+  return {stats, krankenstandTage, bereitschaftCounts, nachtdienste, sonnFeiertagMinuten,
+          gekappteMinuten, gekappteTage,
+          wochenendTage, sonntage, freieWochenenden, wochenendenGesamt,
+          serieMax, serieMaxVon, serieMaxBis, serieAktuell: serie};
 }
 
 function renderYearStats(year){
   document.getElementById('statYearLabel').textContent = '(' + year + ', bis heute)';
-  const {stats, krankenstandTage, bereitschaftCounts, nachtdienste, sonnFeiertagMinuten, gekappteMinuten, gekappteTage} = computeYearShiftStats(year);
+  const jahr = computeYearShiftStats(year);
+  const {stats, krankenstandTage, bereitschaftCounts, nachtdienste, sonnFeiertagMinuten, gekappteMinuten, gekappteTage} = jahr;
 
   const body = document.getElementById('shiftStatsBody');
   if(state.shifts.length===0){
-    body.innerHTML = '<tr><td colspan="3" class="muted">Keine Schichten angelegt.</td></tr>';
+    body.innerHTML = '<tr><td colspan="5" class="muted">Keine Schichten angelegt.</td></tr>';
   } else {
     body.innerHTML = state.shifts.map(s=>{
-      const st = stats[s.id] || {count:0,minutes:0};
+      const st = stats[s.id] || {count:0,minutes:0,diffPlan:0,diffCount:0,kommenSum:0,gehenSum:0,zeitCount:0};
       const label = s.kuerzel ? `${escapeHtml(s.name)} <span class="muted">(${escapeHtml(s.kuerzel)})</span>` : escapeHtml(s.name);
-      return `<tr><td>${label}</td><td>${st.count}</td><td>${fmtHM(st.minutes)}</td></tr>`;
+      const schnittDiff = st.diffCount ? Math.round(st.diffPlan/st.diffCount) : null;
+      const diffCell = schnittDiff===null
+        ? '<span class="muted">–</span>'
+        : `<span class="${schnittDiff>0?'pos':(schnittDiff<0?'neg':'')}">${fmtMinSigned(schnittDiff)}</span>`;
+      const zeitCell = st.zeitCount
+        ? fmtClock(st.kommenSum/st.zeitCount)+'–'+fmtClock(st.gehenSum/st.zeitCount)
+        : '<span class="muted">–</span>';
+      return `<tr><td>${label}</td><td>${st.count}</td><td>${fmtHM(st.minutes)}</td><td>${diffCell}</td><td class="muted">${zeitCell}</td></tr>`;
     }).join('');
   }
 
@@ -1384,6 +1589,12 @@ function renderYearStats(year){
     {label:'Sonn-/Feiertagsstunden', value: fmtHM(sonnFeiertagMinuten), sub: 'Ist-Stunden an Sonn- und Feiertagen, '+year},
     {label:'Gekappte Zeit', value: fmtHM(gekappteMinuten),
      sub: 'Durch die '+KOMMEN_CAP_MINUTES+'-Minuten-Rundung nicht angerechnet, an '+gekappteTage+' Tag(en) '+year},
+    {label:'Wochenenddienste', value: jahr.wochenendTage+'',
+     sub: 'Sa/So mit Dienst, davon '+jahr.sonntage+' Sonntag(e), '+year},
+    {label:'Freie Wochenenden', value: jahr.freieWochenenden+'',
+     sub: 'Sa und So komplett frei, von '+jahr.wochenendenGesamt+' Wochenenden '+year},
+    {label:'Längste Dienstserie', value: jahr.serieMax+' Tage',
+     sub: jahr.serieMaxVon ? (kurzDatum(jahr.serieMaxVon)+'–'+kurzDatum(jahr.serieMaxBis)+' · aktuell '+jahr.serieAktuell+' Tage') : 'keine Dienste erfasst'},
     {label:'Verhältnis andere Schichten : SD', value: ratioValue, custom: ratioHtml, wide:true},
     {label:'Bereitschaften', value: bereitschaftValue, sub: 'Anzahl Tage je Typ, '+year, wide:true}
   ];
@@ -2022,10 +2233,11 @@ function renderAbwesenheiten(){
     return dow!==0 && dow!==6;
   }).length;
 
-  const resturlaub = state.settings.urlaubsanspruch - counts.urlaub;
+  const urlaub = zaehleUrlaub(now.getFullYear());
+  const resturlaub = state.settings.urlaubsanspruch - urlaub.genommen - urlaub.verplant;
   const summary = document.getElementById('abwSummary');
   summary.innerHTML = `
-    <div class="card stat"><div class="label">Urlaub genommen</div><div class="value neutral">${counts.urlaub} Tg</div><div class="sub">Resturlaub: ${resturlaub} Tg</div></div>
+    <div class="card stat"><div class="label">Urlaub</div><div class="value neutral">${urlaub.genommen} Tg</div><div class="sub">genommen · ${urlaub.verplant} verplant · ${resturlaub} offen</div></div>
     <div class="card stat"><div class="label">Krankenstand</div><div class="value neutral">${counts.krankenstand} Tg</div></div>
     <div class="card stat"><div class="label">Feiertage (Werktage)</div><div class="value neutral">${counts.feiertag} Tg</div><div class="sub">${now.getFullYear()}</div></div>
   `;
@@ -2153,6 +2365,101 @@ function renderBeschaeftigungsgrad(){
   });
 }
 
+/* ---------- Suche ---------- */
+let sucheTreffer = [];
+
+function renderSucheForm(){
+  const von = document.getElementById('suVon'), bis = document.getElementById('suBis');
+  if(!von.value) von.value = new Date().getFullYear()+'-01-01';
+  if(!bis.value) bis.value = todayStr();
+  const sel = document.getElementById('suSchicht');
+  const vorher = sel.value;
+  sel.innerHTML = '<option value="">alle</option><option value="__keine">ohne Schicht</option>'
+    + state.shifts.map(sh=>`<option value="${sh.id}">${escapeHtml(sh.name)}${sh.kuerzel?' ('+escapeHtml(sh.kuerzel)+')':''}</option>`).join('');
+  if(vorher) sel.value = vorher;
+}
+
+function sucheAusfuehren(){
+  const von = document.getElementById('suVon').value;
+  const bis = document.getElementById('suBis').value;
+  const schicht = document.getElementById('suSchicht').value;
+  const typ = document.getElementById('suTyp').value;
+  const bereit = document.getElementById('suBereitschaft').value;
+  const tage = document.getElementById('suTage').value;
+  const body = document.getElementById('suBody');
+  if(!von || !bis){ showToast('Bitte Von- und Bis-Datum wählen'); return; }
+  if(von > bis){ showToast('„Von“ muss vor „Bis“ liegen'); return; }
+
+  sucheTreffer = dateRange(von, bis).map(getDayInfo).filter(info=>{
+    if(schicht==='__keine' && info.shiftId) return false;
+    if(schicht && schicht!=='__keine' && info.shiftId!==schicht) return false;
+    // "Arbeit/Frei" fasst die beiden rechnerisch gleichen Typen zusammen
+    if(typ==='arbeit' && !WORK_LIKE_TYPES.includes(info.typ)) return false;
+    if(typ && typ!=='arbeit' && info.typ!==typ) return false;
+    if(bereit==='__any' && info.bereitschaft.length===0) return false;
+    if(bereit && bereit!=='__any' && !info.bereitschaft.includes(bereit)) return false;
+    if(tage==='werktag' && info.isWeekend) return false;
+    if(tage==='wochenende' && !info.isWeekend) return false;
+    return true;
+  });
+
+  document.getElementById('suCsvBtn').disabled = sucheTreffer.length===0;
+  if(sucheTreffer.length===0){
+    body.innerHTML = '<tr><td colspan="8" class="muted">Keine Tage gefunden.</td></tr>';
+    document.getElementById('suSummary').innerHTML = '';
+    return;
+  }
+
+  body.innerHTML = sucheTreffer.map(info=>{
+    const d = parseLocalDate(info.dateStr);
+    const shift = state.shifts.find(sh=>sh.id===info.shiftId);
+    const zeiten = info.segments.filter(sg=>sg.kommen||sg.gehen).map(sg=>(sg.kommen||'?')+'–'+(sg.gehen||'?')).join(' / ') || '–';
+    const cls = info.saldo>0?'pos':(info.saldo<0?'neg':'neutral');
+    return `<tr>
+      <td style="white-space:nowrap;">${pad(d.getDate())}.${pad(d.getMonth()+1)}.${d.getFullYear()}</td>
+      <td class="muted">${WOCHENTAGE[d.getDay()]}</td>
+      <td>${ABW_LABELS[info.typ]||info.typ}${info.holidayName?' <span class="muted">('+escapeHtml(info.holidayName)+')</span>':''}</td>
+      <td>${shift?escapeHtml(shift.kuerzel||shift.name):'–'}</td>
+      <td class="muted">${info.bereitschaft.join(' ')||'–'}</td>
+      <td class="muted" style="white-space:nowrap;">${zeiten}</td>
+      <td class="ist">${fmtHM(info.ist)}</td>
+      <td class="saldo ${cls}">${fmtHMSigned(info.saldo)}</td>
+    </tr>`;
+  }).join('');
+
+  const summe = sucheTreffer.reduce((acc,info)=>({
+    soll: acc.soll+info.soll, ist: acc.ist+info.ist,
+    planzeit: acc.planzeit+info.planzeitMinutes, zeitzugang: acc.zeitzugang+info.zeitzugangMinutes
+  }), {soll:0, ist:0, planzeit:0, zeitzugang:0});
+  const saldo = summe.ist - summe.soll;
+  const cls = saldo>0?'pos':(saldo<0?'neg':'neutral');
+  document.getElementById('suSummary').innerHTML = `
+    <div class="card stat"><div class="label">Treffer</div><div class="value neutral">${sucheTreffer.length}</div><div class="sub">Tage</div></div>
+    <div class="card stat"><div class="label">Ist gesamt</div><div class="value neutral">${fmtHM(summe.ist)}</div><div class="sub">davon ${fmtHM(summe.zeitzugang)} Zeitzugang</div></div>
+    <div class="card stat"><div class="label">Soll</div><div class="value neutral">${fmtHM(summe.soll)}</div></div>
+    <div class="card stat"><div class="label">Saldo</div><div class="value ${cls}">${fmtHMSigned(saldo)}</div><div class="sub">Ist − Soll</div></div>
+    <div class="card stat"><div class="label">Planzeit</div><div class="value neutral">${fmtHM(summe.planzeit)}</div></div>`;
+}
+
+function sucheCsv(){
+  if(sucheTreffer.length===0) return;
+  const rows = [['Datum','Wochentag','Typ','Schicht','Bereitschaft','Zeiten','Zeitzugang','Ist','Soll','Saldo']];
+  sucheTreffer.forEach(info=>{
+    const d = parseLocalDate(info.dateStr);
+    const shift = state.shifts.find(sh=>sh.id===info.shiftId);
+    rows.push([
+      info.dateStr, WOCHENTAGE[d.getDay()], ABW_LABELS[info.typ]||info.typ, shift?shift.name:'',
+      info.bereitschaft.join('+'),
+      info.segments.filter(sg=>sg.kommen||sg.gehen).map(sg=>(sg.kommen||'?')+'-'+(sg.gehen||'?')).join(' / '),
+      info.zeitzugang, fmtHM(info.ist), fmtHM(info.soll), fmtHMSigned(info.saldo)
+    ]);
+  });
+  const csv = rows.map(r=>r.map(v=>'"'+String(v).replace(/"/g,'""')+'"').join(';')).join('\n');
+  downloadFile('auswertung-'+document.getElementById('suVon').value+'-bis-'+document.getElementById('suBis').value+'.csv',
+    csv, 'text/csv;charset=utf-8');
+  showToast(sucheTreffer.length+' Tag(e) exportiert');
+}
+
 /* ---------- Tab-Navigation ---------- */
 function switchTab(tab){
   document.querySelectorAll('#tabNav button').forEach(b=>b.classList.toggle('active', b.dataset.tab===tab));
@@ -2163,6 +2470,7 @@ function switchTab(tab){
   if(tab==='schichten') renderShifts();
   if(tab==='abwesenheiten') renderAbwesenheiten();
   if(tab==='einstellungen') renderSettingsForm();
+  if(tab==='suche') renderSucheForm();
 }
 
 /* ---------- Export / Import ---------- */
@@ -2503,6 +2811,9 @@ function bindEvents(){
     scheduleSave(); renderCustomHolidays(); renderMonth(); renderDashboard(); renderAbwesenheiten(); renderKalender();
     showToast(neu+' gesetzliche(r) Feiertag(e) ergänzt');
   });
+
+  document.getElementById('suSuchenBtn').addEventListener('click', sucheAusfuehren);
+  document.getElementById('suCsvBtn').addEventListener('click', sucheCsv);
 
   document.getElementById('exportJsonBtn').addEventListener('click', exportJson);
   document.getElementById('importJsonInput').addEventListener('change', e=>{
